@@ -15,7 +15,7 @@ namespace FerryKit
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T GetInstance() => _instance is null // 유니티의 오버로드 호출을 피하기 위해 is 패턴으로 null 체크 (성능 최적화)
-            ? _instance = FindFirstObjectByType<T>(FindObjectsInactive.Include)
+            ? _instance = FindAnyObjectByType<T>(FindObjectsInactive.Include)
             : _instance;
 
         private void Awake()

@@ -7,8 +7,8 @@ namespace FerryKit
     {
         public static void ForEach<T>(this List<T> collection, Action<T, int> action)
         {
-            int length = collection.Count;
-            for (int i = 0; i < length; ++i)
+            int len = collection.Count;
+            for (int i = 0; i < len; ++i)
             {
                 action(collection[i], i);
             }

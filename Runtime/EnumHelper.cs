@@ -13,15 +13,15 @@ namespace FerryKit
         public static bool IsDefined<T>(T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int Count<T>() where T : struct, Enum => Cache<T>.Values.Length;
+        public static int Count<T>() where T : struct, Enum => Cache<T>.Count;
 
         public static void ForEach<T>(Action<T> action) where T : struct, Enum
         {
-            var values = Cache<T>.Values;
-            int length = values.Length;
-            for (int i = 0; i < length; ++i)
+            var arr = Cache<T>.Values;
+            int len = arr.Length;
+            for (int i = 0; i < len; ++i)
             {
-                action(values[i]);
+                action(arr[i]);
             }
         }
 
@@ -45,8 +45,8 @@ namespace FerryKit
                 result = default;
                 return false;
             }
-            var stringMap = ignoreCase ? Cache<T>.StringMapIgnoreCase : Cache<T>.StringMap;
-            if (stringMap.TryGetValue(str, out result))
+            var map = ignoreCase ? Cache<T>.StringMapIgnoreCase : Cache<T>.StringMap;
+            if (map.TryGetValue(str, out result))
                 return true;
 
             // Enum.TryParse는 비용이 크므로, 정확히 일치하는 문자열에 대해선 위에서 먼저 처리되도록 한다.

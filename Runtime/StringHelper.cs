@@ -23,8 +23,8 @@ namespace FerryKit
             if (string.IsNullOrEmpty(str))
                 return false;
 
-            int length = str.Length;
-            for (int i = 0; i < length; ++i)
+            int len = str.Length;
+            for (int i = 0; i < len; ++i)
             {
                 if (char.IsWhiteSpace(str[i]))
                     return true;
@@ -40,11 +40,11 @@ namespace FerryKit
             if (maxLength <= suffix.Length)
                 return suffix[..maxLength];
 
-            int cutLength = maxLength - suffix.Length;
-            return string.Create(maxLength, (str, suffix, cutLength), (span, state) =>
+            int cutLen = maxLength - suffix.Length;
+            return string.Create(maxLength, (str, suffix, cutLen), (span, state) =>
             {
-                state.str.AsSpan(0, state.cutLength).CopyTo(span);
-                state.suffix.AsSpan().CopyTo(span[state.cutLength..]);
+                state.str.AsSpan(0, state.cutLen).CopyTo(span);
+                state.suffix.AsSpan().CopyTo(span[state.cutLen..]);
             });
         }
 
