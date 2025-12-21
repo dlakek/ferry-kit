@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace OptimizedUtils
+namespace FerryKit
 {
     public static class ListHelper
     {

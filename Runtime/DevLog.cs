@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using UnityEngine;
 
-namespace OptimizedUtils
+namespace FerryKit
 {
     public static class DevLog
     {

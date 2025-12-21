@@ -1,6 +1,6 @@
 {
-    "name": "OptimizedUtils",
-    "rootNamespace": "OptimizedUtils",
+    "name": "FerryKit",
+    "rootNamespace": "FerryKit",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

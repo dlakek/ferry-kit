@@ -1,6 +1,6 @@
 using System;
 
-namespace OptimizedUtils
+namespace FerryKit
 {
     public static class ArrayHelper
     {

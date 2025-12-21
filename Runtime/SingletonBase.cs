@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-namespace OptimizedUtils
+namespace FerryKit
 {
     /// <summary>
     /// 모든 싱글턴의 공통 로직(생명주기, 파괴 방지, 종료 처리)을 담은 최상위 추상 클래스.

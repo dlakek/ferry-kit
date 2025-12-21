@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using UnityEngine;
 
-namespace OptimizedUtils
+namespace FerryKit
 {
     public static class StringHelper
     {

@@ -1,16 +1,21 @@
 {
-  "name": "com.dlakek.optimized-utils",
+  "name": "com.dlakek.ferry-kit",
   "version": "0.0.1",
-  "displayName": "Unity Optimized Utils",
-  "description": "Performance-optimized utility scripts for Unity.",
+  "displayName": "Ferry Kit",
+  "description": "A Unity utility toolkit aiming for memory and performance optimization. Collects frequently used patterns and convenience features to ferry your development process.",
   "unity": "6000.3",
   "author": {
-    "name": "dlakek"
+    "name": "dlakek",
+    "email": "dlakek@naver.com",
+    "url": "https://github.com/dlakek/ferry-kit"
   },
   "keywords": [
+    "unity",
     "utility",
+    "optimization",
+    "design-patterns",
+    "ferry-kit",
     "singleton",
-    "idpool",
-    "number"
+    "idpool"
   ]
 }
