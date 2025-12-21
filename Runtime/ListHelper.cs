@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+
+namespace OptimizedUtils
+{
+    public static class ListHelper
+    {
+        public static void ForEach<T>(this List<T> collection, Action<T, int> action)
+        {
+            int length = collection.Count;
+            for (int i = 0; i < length; ++i)
+            {
+                action(collection[i], i);
+            }
+        }
+
+        public static void ForEach<T>(this LinkedList<T> collection, Action<T> action)
+        {
+            foreach (var e in collection)
+            {
+                action(e);
+            }
+        }
+
+        public static void ForEach<T>(this LinkedList<T> collection, Action<T, int> action)
+        {
+            int i = -1;
+            foreach (var e in collection)
+            {
+                action(e, ++i);
+            }
+        }
+
+        public static void Assign<T>(this List<T> collection, int count, T value = default)
+        {
+            collection.Clear();
+            if (collection.Capacity < count)
+            {
+                collection.Capacity = count;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                collection.Add(value);
+            }
+        }
+
+        public static void Assign<T>(this List<T> collection, int count, Func<T> creator)
+        {
+            collection.Clear();
+            if (collection.Capacity < count)
+            {
+                collection.Capacity = count;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                collection.Add(creator());
+            }
+        }
+
+        public static void Append<T>(this List<T> collection, int count, T value = default)
+        {
+            if (collection.Capacity < collection.Count + count)
+            {
+                collection.Capacity = collection.Count + count;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                collection.Add(value);
+            }
+        }
+
+        public static void Append<T>(this List<T> collection, int count, Func<T> creator)
+        {
+            if (collection.Capacity < collection.Count + count)
+            {
+                collection.Capacity = collection.Count + count;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                collection.Add(creator());
+            }
+        }
+    }
+}
