@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace OptimizedUtils
 {
     /// <summary>
-    /// 숫자 연산 추상화 (구조체 제약을 통해 함수 호출 및 박싱 발생 제거 가능)
+    /// 숫자 연산 추상화 (구조체 제약을 통해 가상 함수 호출 및 박싱 발생 제거 가능)
     /// 추후 유니티에서 C# 11 이상 지원시 언어 자체에서 제공하는 INumber로 대체
     /// </summary>
     public interface INumOp<T>
