@@ -1,0 +1,16 @@
+{
+  "name": "com.dlakek.optimized-utils",
+  "version": "1.0.0",
+  "displayName": "Unity Optimized Utils",
+  "description": "Performance-optimized utility scripts for Unity.",
+  "unity": "6000.3",
+  "author": {
+    "name": "dlakek"
+  },
+  "keywords": [
+    "utility",
+    "singleton",
+    "idpool",
+    "number"
+  ]
+}
