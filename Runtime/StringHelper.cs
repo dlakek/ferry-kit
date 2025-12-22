@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEngine;
 
@@ -6,7 +8,7 @@ namespace FerryKit
 {
     public static class StringHelper
     {
-        private const int BUFFER_SIZE_LIMIT = 1024;
+        private const int BUFFER_SIZE_LIMIT = 512;
 
         internal static readonly char[] _hexTable = new[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
@@ -18,11 +20,10 @@ namespace FerryKit
         public static string Color(this string str, string color) => $"<color={color}>{str}</color>";
         public static string Color(this string str, int r, int g, int b) => $"<color=#{r:X2}{g:X2}{b:X2}>{str}</color>";
 
-        public static bool HasWhiteSpace(this string str)
-        {
-            if (string.IsNullOrEmpty(str))
-                return false;
+        public static bool HasWhiteSpace(this string str) => str?.AsSpan().HasWhiteSpace() ?? false;
 
+        public static bool HasWhiteSpace(this ReadOnlySpan<char> str)
+        {
             int len = str.Length;
             for (int i = 0; i < len; ++i)
             {
@@ -32,38 +33,70 @@ namespace FerryKit
             return false;
         }
 
-        public static string Truncate(this string str, int maxLength, string suffix = "...")
+        public static string Truncate(this string str, int len, string suffix = "...")
         {
-            if (string.IsNullOrEmpty(str) || str.Length <= maxLength)
+            if (string.IsNullOrEmpty(str) || str.Length <= len)
                 return str;
 
-            if (maxLength <= suffix.Length)
-                return suffix[..maxLength];
+            if (len <= suffix.Length)
+                return suffix[..len];
 
-            int cutLen = maxLength - suffix.Length;
-            return string.Create(maxLength, (str, suffix, cutLen), (span, state) =>
+            int cutLen = len - suffix.Length;
+            return string.Create(len, (str, suffix, cutLen), (buffer, state) =>
             {
-                state.str.AsSpan(0, state.cutLen).CopyTo(span);
-                state.suffix.AsSpan().CopyTo(span[state.cutLen..]);
+                buffer.ApplyTruncate(state.str, state.suffix, state.cutLen);
             });
+        }
+
+        public static string Truncate(this ReadOnlySpan<char> str, int len, string suffix = "...")
+        {
+            if (str.IsEmpty || str.Length <= len)
+                return str.ToString();
+
+            if (len <= suffix.Length)
+                return suffix[..len];
+
+            int cutLen = len - suffix.Length;
+            if (len <= BUFFER_SIZE_LIMIT)
+                return stackalloc char[len].ApplyTruncate(str, suffix, cutLen).ToString();
+
+            var buffer = ArrayPool<char>.Shared.Rent(len);
+            try
+            {
+                return buffer.AsSpan(0, len).ApplyTruncate(str, suffix, cutLen).ToString();
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(buffer);
+            }
         }
 
         public static string ToCamelCase(this string str)
         {
-            if (string.IsNullOrEmpty(str) || !char.IsUpper(str[0]))
+            if (string.IsNullOrEmpty(str) || char.IsLower(str[0]))
                 return str;
 
-            int len = str.Length;
-            var buffer = len <= BUFFER_SIZE_LIMIT ? stackalloc char[len] : new char[len];
-            str.AsSpan().CopyTo(buffer);
-            for (int i = 0; i < len && char.IsUpper(buffer[i]); ++i)
-            {
-                if (i + 1 < len && !char.IsUpper(buffer[i + 1]))
-                    break;
+            return string.Create(str.Length, str, (buffer, str) => buffer.ApplyCamelCase(str));
+        }
 
-                buffer[i] = char.ToLowerInvariant(buffer[i]);
+        public static string ToCamelCase(this ReadOnlySpan<char> str)
+        {
+            if (str.IsEmpty || char.IsLower(str[0]))
+                return str.ToString();
+
+            int len = str.Length;
+            if (len <= BUFFER_SIZE_LIMIT)
+                return stackalloc char[len].ApplyCamelCase(str).ToString();
+
+            var buffer = ArrayPool<char>.Shared.Rent(len);
+            try
+            {
+                return buffer.AsSpan(0, len).ApplyCamelCase(str).ToString();
             }
-            return new(buffer);
+            finally
+            {
+                ArrayPool<char>.Shared.Return(buffer);
+            }
         }
 
         public static string ToPascalCase(this string str)
@@ -71,11 +104,58 @@ namespace FerryKit
             if (string.IsNullOrEmpty(str) || char.IsUpper(str[0]))
                 return str;
 
+            return string.Create(str.Length, str, (buffer, str) => buffer.ApplyPascalCase(str));
+        }
+
+        public static string ToPascalCase(this ReadOnlySpan<char> str)
+        {
+            if (str.IsEmpty || char.IsUpper(str[0]))
+                return str.ToString();
+
             int len = str.Length;
-            var buffer = len <= BUFFER_SIZE_LIMIT ? stackalloc char[len] : new char[len];
-            str.AsSpan().CopyTo(buffer);
+            if (len <= BUFFER_SIZE_LIMIT)
+                return stackalloc char[len].ApplyPascalCase(str).ToString();
+
+            var buffer = ArrayPool<char>.Shared.Rent(len);
+            try
+            {
+                return buffer.AsSpan(0, len).ApplyPascalCase(str).ToString();
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(buffer);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Span<char> ApplyTruncate(this Span<char> buffer, ReadOnlySpan<char> str, ReadOnlySpan<char> suffix, int cutLen)
+        {
+            str[..cutLen].CopyTo(buffer);
+            suffix.CopyTo(buffer[cutLen..]);
+            return buffer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Span<char> ApplyCamelCase(this Span<char> buffer, ReadOnlySpan<char> str)
+        {
+            str.CopyTo(buffer);
+            int len = buffer.Length;
+            for (int i = 0; i < len && char.IsUpper(buffer[i]); ++i)
+            {
+                if (i > 0 && i + 1 < len && char.IsLower(buffer[i + 1]))
+                    break;
+
+                buffer[i] = char.ToLowerInvariant(buffer[i]);
+            }
+            return buffer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Span<char> ApplyPascalCase(this Span<char> buffer, ReadOnlySpan<char> str)
+        {
+            str.CopyTo(buffer);
             buffer[0] = char.ToUpperInvariant(buffer[0]);
-            return new(buffer);
+            return buffer;
         }
     }
 
