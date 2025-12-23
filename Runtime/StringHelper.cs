@@ -20,14 +20,88 @@ namespace FerryKit
         public static string Color(this string str, string color) => $"<color={color}>{str}</color>";
         public static string Color(this string str, int r, int g, int b) => $"<color=#{r:X2}{g:X2}{b:X2}>{str}</color>";
 
-        public static bool HasWhiteSpace(this string str) => str?.AsSpan().HasWhiteSpace() ?? false;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ReadOnlySpan<char> TrimQuotes(this ReadOnlySpan<char> span) => span.Length > 1 && span[0] == '"' && span[^1] == '"' ? span[1..^1] : span;
 
-        public static bool HasWhiteSpace(this ReadOnlySpan<char> str)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ReadOnlySpan<char> TrimEndOne(this ReadOnlySpan<char> span, char trimChar) => !span.IsEmpty && span[^1] == trimChar ? span[..^1] : span;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ReadOnlySpan<char> TrimStartOne(this ReadOnlySpan<char> span, char trimChar) => !span.IsEmpty && span[0] == trimChar ? span[1..] : span;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, int startIndex, bool handleEscape = false)
         {
-            int len = str.Length;
+            var slice = span[startIndex..];
+            int idx = slice.IndexOfUnquoted(value, handleEscape);
+            return idx == -1 ? -1 : startIndex + idx;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, bool handleEscape = false)
+            => handleEscape
+            ? span.IndexOfUnquotedWithEscape(value)
+            : span.IndexOfUnquotedNoEscape(value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int IndexOfUnquotedNoEscape(this ReadOnlySpan<char> span, char value)
+        {
+            var inQuotes = false;
+            int offset = 0;
+            while (true)
+            {
+                var slice = span[offset..];
+                int idx = inQuotes ? slice.IndexOf('"') : slice.IndexOfAny('"', value);
+                if (idx == -1)
+                    return -1;
+
+                if (slice[idx] != '"')
+                    return offset + idx;
+
+                inQuotes = !inQuotes;
+                offset += idx + 1;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int IndexOfUnquotedWithEscape(this ReadOnlySpan<char> span, char value)
+        {
+            var inQuotes = false;
+            int offset = 0;
+            while (true)
+            {
+                var slice = span[offset..];
+                int idx = inQuotes ? slice.IndexOfAny('"', '\\') : slice.IndexOfAny('"', value);
+                if (idx == -1)
+                    return -1;
+
+                if (slice[idx] == '\\')
+                {
+                    offset += idx + 2;
+                    if (offset > span.Length) return -1;
+                    continue;
+                }
+                if (slice[idx] != '"')
+                    return offset + idx;
+
+                inQuotes = !inQuotes;
+                offset += idx + 1;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool HasWhiteSpace(this string str)
+        {
+            return str?.AsSpan().HasWhiteSpace() ?? false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool HasWhiteSpace(this ReadOnlySpan<char> span)
+        {
+            int len = span.Length;
             for (int i = 0; i < len; ++i)
             {
-                if (char.IsWhiteSpace(str[i]))
+                if (char.IsWhiteSpace(span[i]))
                     return true;
             }
             return false;
@@ -48,22 +122,22 @@ namespace FerryKit
             });
         }
 
-        public static string Truncate(this ReadOnlySpan<char> str, int len, string suffix = "...")
+        public static string Truncate(this ReadOnlySpan<char> span, int len, string suffix = "...")
         {
-            if (str.IsEmpty || str.Length <= len)
-                return str.ToString();
+            if (span.IsEmpty || span.Length <= len)
+                return span.ToString();
 
             if (len <= suffix.Length)
                 return suffix[..len];
 
             int cutLen = len - suffix.Length;
             if (len <= BUFFER_SIZE_LIMIT)
-                return stackalloc char[len].ApplyTruncate(str, suffix, cutLen).ToString();
+                return stackalloc char[len].ApplyTruncate(span, suffix, cutLen).ToString();
 
             var buffer = ArrayPool<char>.Shared.Rent(len);
             try
             {
-                return buffer.AsSpan(0, len).ApplyTruncate(str, suffix, cutLen).ToString();
+                return buffer.AsSpan(0, len).ApplyTruncate(span, suffix, cutLen).ToString();
             }
             finally
             {
@@ -79,19 +153,19 @@ namespace FerryKit
             return string.Create(str.Length, str, (buffer, str) => buffer.ApplyCamelCase(str));
         }
 
-        public static string ToCamelCase(this ReadOnlySpan<char> str)
+        public static string ToCamelCase(this ReadOnlySpan<char> span)
         {
-            if (str.IsEmpty || char.IsLower(str[0]))
-                return str.ToString();
+            if (span.IsEmpty || char.IsLower(span[0]))
+                return span.ToString();
 
-            int len = str.Length;
+            int len = span.Length;
             if (len <= BUFFER_SIZE_LIMIT)
-                return stackalloc char[len].ApplyCamelCase(str).ToString();
+                return stackalloc char[len].ApplyCamelCase(span).ToString();
 
             var buffer = ArrayPool<char>.Shared.Rent(len);
             try
             {
-                return buffer.AsSpan(0, len).ApplyCamelCase(str).ToString();
+                return buffer.AsSpan(0, len).ApplyCamelCase(span).ToString();
             }
             finally
             {
@@ -107,19 +181,19 @@ namespace FerryKit
             return string.Create(str.Length, str, (buffer, str) => buffer.ApplyPascalCase(str));
         }
 
-        public static string ToPascalCase(this ReadOnlySpan<char> str)
+        public static string ToPascalCase(this ReadOnlySpan<char> span)
         {
-            if (str.IsEmpty || char.IsUpper(str[0]))
-                return str.ToString();
+            if (span.IsEmpty || char.IsUpper(span[0]))
+                return span.ToString();
 
-            int len = str.Length;
+            int len = span.Length;
             if (len <= BUFFER_SIZE_LIMIT)
-                return stackalloc char[len].ApplyPascalCase(str).ToString();
+                return stackalloc char[len].ApplyPascalCase(span).ToString();
 
             var buffer = ArrayPool<char>.Shared.Rent(len);
             try
             {
-                return buffer.AsSpan(0, len).ApplyPascalCase(str).ToString();
+                return buffer.AsSpan(0, len).ApplyPascalCase(span).ToString();
             }
             finally
             {
@@ -128,17 +202,17 @@ namespace FerryKit
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Span<char> ApplyTruncate(this Span<char> buffer, ReadOnlySpan<char> str, ReadOnlySpan<char> suffix, int cutLen)
+        private static Span<char> ApplyTruncate(this Span<char> buffer, ReadOnlySpan<char> span, ReadOnlySpan<char> suffix, int cutLen)
         {
-            str[..cutLen].CopyTo(buffer);
+            span[..cutLen].CopyTo(buffer);
             suffix.CopyTo(buffer[cutLen..]);
             return buffer;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Span<char> ApplyCamelCase(this Span<char> buffer, ReadOnlySpan<char> str)
+        private static Span<char> ApplyCamelCase(this Span<char> buffer, ReadOnlySpan<char> span)
         {
-            str.CopyTo(buffer);
+            span.CopyTo(buffer);
             int len = buffer.Length;
             for (int i = 0; i < len && char.IsUpper(buffer[i]); ++i)
             {
@@ -151,9 +225,9 @@ namespace FerryKit
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Span<char> ApplyPascalCase(this Span<char> buffer, ReadOnlySpan<char> str)
+        private static Span<char> ApplyPascalCase(this Span<char> buffer, ReadOnlySpan<char> span)
         {
-            str.CopyTo(buffer);
+            span.CopyTo(buffer);
             buffer[0] = char.ToUpperInvariant(buffer[0]);
             return buffer;
         }

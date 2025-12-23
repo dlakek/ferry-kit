@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
 
 namespace FerryKit
 {
@@ -48,7 +47,7 @@ namespace FerryKit
                 }
                 else
                 {
-                    value = CreatorCache<TValue>.Creator();
+                    value = ExpressionCache<TValue>.Creator();
                 }
                 collection.Add(key, value);
             }
@@ -73,11 +72,6 @@ namespace FerryKit
                 collection.Add(key, value);
             }
             return value;
-        }
-
-        private static class CreatorCache<T> where T : new()
-        {
-            public static readonly Func<T> Creator = Expression.Lambda<Func<T>>(Expression.New(typeof(T))).Compile();
         }
     }
 }
