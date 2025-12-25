@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace FerryKit
+namespace FerryKit.Core
 {
     /// <summary>
     /// 숫자 연산 추상화 (구조체 제약을 통해 가상 함수 호출 및 박싱 발생 제거 가능)

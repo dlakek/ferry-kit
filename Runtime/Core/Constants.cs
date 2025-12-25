@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace FerryKit
+namespace FerryKit.Core
 {
     public static class Opt
     {

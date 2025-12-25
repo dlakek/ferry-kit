@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
-namespace FerryKit
+namespace FerryKit.Core
 {
     public delegate T SpanParser<T>(ReadOnlySpan<char> span);
 
@@ -14,22 +13,17 @@ namespace FerryKit
 
     public static class CSVLoader
     {
-        public static List<T> Load<T>(TextAsset csvAsset, bool isSkipHeader = true) where T : IDataFromCSV, new()
+        public static List<T> Load<T>(string csvText, bool isSkipHeader = true) where T : IDataFromCSV, new()
         {
-            if (csvAsset == null)
+            if (string.IsNullOrEmpty(csvText))
                 return null;
 
-            var text = csvAsset.text;
-            var len = text.Length;
-            if (len == 0)
-                return null;
-
-            var rowSplitter = RowSplitter.From(text);
+            var rowSplitter = RowSplitter.From(csvText);
             if (isSkipHeader)
             {
                 rowSplitter.MoveNext();
             }
-            var result = new List<T>(len / 50);
+            var result = new List<T>(csvText.Length / 50);
             foreach (var row in rowSplitter)
             {
                 if (row.IsWhiteSpace())
@@ -259,8 +253,7 @@ namespace FerryKit
                 if (IsGenericType(type, typeof(Dictionary<,>)))
                     return CreateWrapper(nameof(DictWrapper), type.GetGenericArguments());
 
-                DevLog.LogWarning($"[CSV] No parser for {type.Name}");
-                return _ => default;
+                throw new ArgumentException($"[CSV] No parser for {type.Name}");
             }
 
             [MethodImpl(Opt.Inline)]

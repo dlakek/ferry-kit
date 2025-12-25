@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace FerryKit
+namespace FerryKit.Core
 {
     public interface IIdPool<T>
     {

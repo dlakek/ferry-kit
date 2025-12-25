@@ -1,3 +1,4 @@
+using FerryKit.Core;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -58,7 +59,8 @@ namespace FerryKit
     {
         public static T Instance
         {
-            [MethodImpl(Opt.Inline)] get => GetInstance() ?? CreateInstance();
+            [MethodImpl(Opt.Inline)]
+            get => GetInstance() ?? CreateInstance();
         }
 
         /// <summary>
@@ -84,7 +86,8 @@ namespace FerryKit
     {
         public static T Instance
         {
-            [MethodImpl(Opt.Inline)] get => GetInstance() ?? Logging();
+            [MethodImpl(Opt.Inline)]
+            get => GetInstance() ?? Logging();
         }
 
         /// <summary>

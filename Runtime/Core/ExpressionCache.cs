@@ -1,7 +1,7 @@
 using System;
 using System.Linq.Expressions;
 
-namespace FerryKit
+namespace FerryKit.Core
 {
     public static class ExpressionCache<T> where T : new()
     {
