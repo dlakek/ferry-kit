@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace FerryKit
 {
@@ -40,18 +41,10 @@ namespace FerryKit
             _curId = _op.Sub(startId, _op.One);
         }
 
-        public T NextId()
-        {
-            if (_op.GTE(_curId, _maxId))
-            {
-                _curId = _startId;
-            }
-            else
-            {
-                _op.Inc(ref _curId);
-            }
-            return _curId;
-        }
+        [MethodImpl(Opt.Inline)]
+        public T NextId() => _op.GTE(_curId, _maxId)
+            ? _curId = _startId
+            : _op.Inc(ref _curId);
 
         public void ReleaseId(T id) { } // 구현 불필요
     }

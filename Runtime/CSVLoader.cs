@@ -53,20 +53,20 @@ namespace FerryKit
 
         public readonly ReadOnlySpan<char> Current
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            [MethodImpl(Opt.Inline)]
             get => _curRow;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public readonly RowSplitter GetEnumerator() => this;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public static RowSplitter From(ReadOnlySpan<char> text) => new(text);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public RowSplitter(ReadOnlySpan<char> text) : this() => _remain = text;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public bool MoveNext()
         {
             if (_remain.Length == 0)
@@ -93,10 +93,10 @@ namespace FerryKit
 
         private int _curIdx;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public static RowReader From(ReadOnlySpan<char> row) => new(row);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public RowReader(ReadOnlySpan<char> row) : this() => _row = row;
 
         // 이 함수는 인라인 강제하지 않는 편이 좋을듯함. (호출하는 곳이 많을 것이므로)
@@ -148,7 +148,7 @@ namespace FerryKit
         // 제네릭 래퍼 메서드 (리플렉션 바인딩용)
         // ---------------------------------------------------------
 
-        public static T EnumWrapper<T>(ReadOnlySpan<char> span) where T : struct, Enum => span.IsEmpty ? default : EnumHelper.ToEnum<T>(span, true);
+        public static T EnumWrapper<T>(ReadOnlySpan<char> span) where T : struct, Enum => span.IsEmpty ? default : EnumHelper.Parse<T>(span, true);
         public static T[] ArrayWrapper<T>(ReadOnlySpan<char> span) => ToArray(span, Cache<T>.Parse);
         public static List<T> ListWrapper<T>(ReadOnlySpan<char> span) => ToList(span, Cache<T>.Parse);
         public static Dictionary<K, V> DictWrapper<K, V>(ReadOnlySpan<char> span) => ToDictionary(span, Cache<K>.Parse, Cache<V>.Parse);
@@ -215,7 +215,7 @@ namespace FerryKit
             return dict;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         private static void ParseKvPair<K, V>(ReadOnlySpan<char> pairSpan, Dictionary<K, V> dict, SpanParser<K> kParser, SpanParser<V> vParser, char kvSep)
         {
             int eqIndex = pairSpan.IndexOfUnquoted(kvSep);
@@ -263,11 +263,11 @@ namespace FerryKit
                 return _ => default;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            [MethodImpl(Opt.Inline)]
             private static bool IsGenericType(Type type, Type genericDef)
                 => type.IsGenericType && type.GetGenericTypeDefinition() == genericDef;
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            [MethodImpl(Opt.Inline)]
             private static SpanParser<T> CreateWrapper(string methodName, params Type[] typeArgs)
             {
                 var method = typeof(ParseHelper).GetMethod(methodName).MakeGenericMethod(typeArgs);

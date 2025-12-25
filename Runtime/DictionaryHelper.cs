@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace FerryKit
 {
     public static class DictionaryHelper
     {
+        [MethodImpl(Opt.Inline)]
         public static void ForEach<TKey, TValue>(this Dictionary<TKey, TValue> collection, Action<KeyValuePair<TKey, TValue>> action)
         {
             foreach (var e in collection)
@@ -13,6 +15,7 @@ namespace FerryKit
             }
         }
 
+        [MethodImpl(Opt.Inline)]
         public static void ForEach<TKey, TValue>(this Dictionary<TKey, TValue> collection, Action<TKey, TValue> action)
         {
             foreach (var e in collection)
@@ -21,6 +24,7 @@ namespace FerryKit
             }
         }
 
+        [MethodImpl(Opt.Inline)]
         public static void ForEach<TKey, TValue>(this Dictionary<TKey, TValue>.KeyCollection collection, Action<TKey> action)
         {
             foreach (var e in collection)
@@ -29,6 +33,7 @@ namespace FerryKit
             }
         }
 
+        [MethodImpl(Opt.Inline)]
         public static void ForEach<TKey, TValue>(this Dictionary<TKey, TValue>.ValueCollection collection, Action<TValue> action)
         {
             foreach (var e in collection)
@@ -37,6 +42,7 @@ namespace FerryKit
             }
         }
 
+        [MethodImpl(Opt.Inline)]
         public static TValue GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> collection, TKey key) where TValue : new()
         {
             if (!collection.TryGetValue(key, out var value))
@@ -54,6 +60,7 @@ namespace FerryKit
             return value;
         }
 
+        [MethodImpl(Opt.Inline)]
         public static TValue GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> collection, TKey key, TValue defaultValue)
         {
             if (!collection.TryGetValue(key, out var value))
@@ -64,6 +71,7 @@ namespace FerryKit
             return value;
         }
 
+        [MethodImpl(Opt.Inline)]
         public static TValue GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> collection, TKey key, Func<TValue> creator)
         {
             if (!collection.TryGetValue(key, out var value))

@@ -6,16 +6,29 @@ namespace FerryKit
 {
     public static class EnumHelper
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public static ReadOnlySpan<T> GetValues<T>() where T : struct, Enum => new(Cache<T>.Values);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsDefined<T>(T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         public static int Count<T>() where T : struct, Enum => Cache<T>.Count;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
+        public static bool IsDefined<T>(T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TrueForAll<T>(Predicate<T> match) where T : struct, Enum
+        {
+            var arr = Cache<T>.Values;
+            int len = arr.Length;
+            for (int i = 0; i < len; ++i)
+            {
+                if (!match(arr[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        [MethodImpl(Opt.Inline)]
         public static void ForEach<T>(Action<T> action) where T : struct, Enum
         {
             var arr = Cache<T>.Values;
@@ -26,19 +39,19 @@ namespace FerryKit
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T ToEnum<T>(this string str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        [MethodImpl(Opt.Inline)]
+        public static T Parse<T>(this string str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
-            if (!str.TryToEnum(out T result, ignoreCase, ignoreSpace))
+            if (!str.TryParse(out T result, ignoreCase, ignoreSpace))
                 throw new ArgumentException($"'{str}' could not be converted to enum '{typeof(T)}'.");
 
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T ToEnum<T>(this ReadOnlySpan<char> str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        [MethodImpl(Opt.Inline)]
+        public static T Parse<T>(this ReadOnlySpan<char> str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
-            if (!str.TryToEnum(out T result, ignoreCase, ignoreSpace))
+            if (!str.TryParse(out T result, ignoreCase, ignoreSpace))
                 throw new ArgumentException($"'{str.ToString()}' could not be converted to enum '{typeof(T)}'.");
 
             return result;
@@ -47,7 +60,7 @@ namespace FerryKit
         /// <summary>
         /// Enum.TryParse보다 훨씬 최적화된 파싱 함수
         /// </summary>
-        public static bool TryToEnum<T>(this string str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        public static bool TryParse<T>(this string str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
             if (string.IsNullOrEmpty(str))
             {
@@ -65,7 +78,7 @@ namespace FerryKit
 
             // ignoreSpace인 경우 str.Trim()해서 체크해야 하는데, GC 발생을 피하기 위해 Span버전으로 넘겨서 처리한다.
             return ignoreSpace
-                ? str.AsSpan().TryToEnum(out result, ignoreCase, ignoreSpace)
+                ? str.AsSpan().TryParse(out result, ignoreCase, ignoreSpace)
                 : str.AsSpan().TryParseFromIntForm(out result);
         }
 
@@ -73,7 +86,7 @@ namespace FerryKit
         /// Span버전은 GC 발생 안되는 것을 최우선으로 하기 때문에
         /// Dictionary으로 탐색 불가능하여 선형탐색으로 찾는다. (추후 .NET 9의 AlternateLookup 사용 가능해지면 수정 필요)
         /// </summary>
-        public static bool TryToEnum<T>(this ReadOnlySpan<char> str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        public static bool TryParse<T>(this ReadOnlySpan<char> str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
             var span = ignoreSpace ? str.Trim() : str;
             if (span.IsEmpty)
@@ -102,7 +115,7 @@ namespace FerryKit
         /// <summary>
         /// "1"과 같이 숫자값인 문자열을 받았을 때, enum의 실제값 중 일치하는 값이 있다면 변환해준다.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         private static bool TryParseFromIntForm<T>(this ReadOnlySpan<char> str, out T result) where T : struct, Enum
         {
             if (int.TryParse(str, out int intVal))

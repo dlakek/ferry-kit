@@ -13,7 +13,7 @@ namespace FerryKit
         protected static T _instance;
         protected static bool _isQuitting;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(Opt.Inline)]
         protected static T GetInstance() => _instance is null // 유니티의 오버로드 호출을 피하기 위해 is 패턴으로 null 체크 (성능 최적화)
             ? _instance = FindAnyObjectByType<T>(FindObjectsInactive.Include)
             : _instance;
@@ -56,7 +56,10 @@ namespace FerryKit
     /// </summary>
     public abstract class SingletonDynamic<T> : SingletonBase<T> where T : SingletonDynamic<T>
     {
-        public static T Instance => GetInstance() ?? CreateInstance();
+        public static T Instance
+        {
+            [MethodImpl(Opt.Inline)] get => GetInstance() ?? CreateInstance();
+        }
 
         /// <summary>
         /// Instance getter 인라인 최적화가 이루어지도록 하기 위해
@@ -79,7 +82,10 @@ namespace FerryKit
     /// </summary>
     public abstract class SingletonStatic<T> : SingletonBase<T> where T : SingletonStatic<T>
     {
-        public static T Instance => GetInstance() ?? Logging();
+        public static T Instance
+        {
+            [MethodImpl(Opt.Inline)] get => GetInstance() ?? Logging();
+        }
 
         /// <summary>
         /// Instance getter 인라인 최적화가 이루어지도록 하기 위해
