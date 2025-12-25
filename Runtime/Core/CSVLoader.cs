@@ -30,7 +30,7 @@ namespace FerryKit.Core
                     continue;
 
                 var reader = RowReader.From(row);
-                var data = ExpressionCache<T>.Creator();
+                var data = ExpressionCache<T>.New();
                 if (data.Parse(ref reader))
                 {
                     result.Add(data);

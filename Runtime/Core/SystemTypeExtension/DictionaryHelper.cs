@@ -47,14 +47,7 @@ namespace FerryKit.Core
         {
             if (!collection.TryGetValue(key, out var value))
             {
-                if (typeof(TValue).IsValueType)
-                {
-                    value = default;
-                }
-                else
-                {
-                    value = ExpressionCache<TValue>.Creator();
-                }
+                value = ExpressionCache<TValue>.New();
                 collection.Add(key, value);
             }
             return value;
