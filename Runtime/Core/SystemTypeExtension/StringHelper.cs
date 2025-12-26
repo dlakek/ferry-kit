@@ -9,6 +9,13 @@ namespace FerryKit.Core
     {
         private const int _bufferSizeLimit = 512;
 
+        public enum QuoteEscapeMode : byte
+        {
+            None,
+            Csv,
+            Backslash,
+        }
+
         public static ReadOnlySpan<char> HexTable => "0123456789ABCDEF";
 
         [MethodImpl(Opt.Inline)] public static string Bold(this string str) => str.FormatTag('b');
@@ -27,23 +34,31 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimStartOne(this ReadOnlySpan<char> span, char trimChar) => !span.IsEmpty && span[0] == trimChar ? span[1..] : span;
 
         [MethodImpl(Opt.Inline)]
-        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, bool handleEscape = false)
-            => handleEscape
-            ? span.IndexOfUnquotedWithEscape(value)
-            : span.IndexOfUnquotedNoEscape(value);
+        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, QuoteEscapeMode escapeMode = QuoteEscapeMode.None) => escapeMode switch
+        {
+            QuoteEscapeMode.Backslash => span.IndexOfUnquotedWithEscape(value),
+            QuoteEscapeMode.Csv => span.IndexOfUnquotedCsv(value),
+            _ => span.IndexOfUnquotedNoEscape(value),
+        };
 
         [MethodImpl(Opt.Inline)]
-        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, int startIndex, bool handleEscape = false)
+        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, int startIndex, QuoteEscapeMode escapeMode = QuoteEscapeMode.None)
         {
+            if ((uint)startIndex >= (uint)span.Length)
+                return -1;
+
             var slice = span[startIndex..];
-            int idx = slice.IndexOfUnquoted(value, handleEscape);
+            int idx = slice.IndexOfUnquoted(value, escapeMode);
             return idx == -1 ? -1 : startIndex + idx;
         }
 
         [MethodImpl(Opt.Inline)]
         public static bool HasWhiteSpace(this string str)
         {
-            return str?.AsSpan().HasWhiteSpace() ?? false;
+            if (str is null)
+                return false;
+
+            return str.AsSpan().HasWhiteSpace();
         }
 
         [MethodImpl(Opt.Inline)]
@@ -189,6 +204,9 @@ namespace FerryKit.Core
             });
         }
 
+        /// <summary>
+        /// T is expected to be string or int only
+        /// </summary>
         private static string FormatTag<T>(this string str, string tag, T value)
         {
             int valLen = typeof(T) == typeof(string)
@@ -264,6 +282,7 @@ namespace FerryKit.Core
         {
             var inQuotes = false;
             int offset = 0;
+            int len = span.Length;
             while (true)
             {
                 var slice = span[offset..];
@@ -271,18 +290,54 @@ namespace FerryKit.Core
                 if (idx == -1)
                     return -1;
 
-                if (slice[idx] == '\\')
+                var c = slice[idx];
+                if (c == '\\')
                 {
                     offset += idx + 2;
-                    if (offset > span.Length) return -1;
+                    if (offset >= len)
+                        return -1;
+
                     continue;
                 }
-                if (slice[idx] != '"')
+                if (c != '"')
                     return offset + idx;
 
                 inQuotes = !inQuotes;
                 offset += idx + 1;
             }
+        }
+
+        public static int IndexOfUnquotedCsv(this ReadOnlySpan<char> span, char value)
+        {
+            var inQuotes = false;
+            int offset = 0;
+            int len = span.Length;
+            while (offset < len)
+            {
+                var slice = span[offset..];
+                int idx = inQuotes ? slice.IndexOf('"') : slice.IndexOfAny('"', value);
+                if (idx == -1)
+                    return -1;
+
+                if (!inQuotes)
+                {
+                    if (slice[idx] == value)
+                        return offset + idx;
+
+                    inQuotes = true;
+                    offset += idx + 1;
+                    continue;
+                }
+                int next = offset + idx + 1;
+                if (next < len && span[next] == '"')
+                {
+                    offset = next + 1;
+                    continue;
+                }
+                inQuotes = false;
+                offset = next;
+            }
+            return -1;
         }
 
         [MethodImpl(Opt.Inline)]
