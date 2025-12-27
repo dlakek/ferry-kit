@@ -101,8 +101,10 @@ namespace FerryKit.Core
         public bool MoveNext()
         {
             if (_remain.Length == 0)
+            {
+                _curLine = ReadOnlySpan<char>.Empty;
                 return false;
-
+            }
             int idx = _remain.IndexOfUnquoted('\n', _policy.EscapeMode);
             if (idx == -1)
             {
@@ -126,11 +128,11 @@ namespace FerryKit.Core
         private readonly ReadOnlySpan<char> _line;
         private readonly P _policy;
 
-        private ReadOnlySpan<char> _lastRead;
+        private ReadOnlySpan<char> _curRead;
         private int _curIdx;
 
         public readonly ReadOnlySpan<char> Line => _line;
-        public readonly ReadOnlySpan<char> LastRead => _lastRead;
+        public readonly ReadOnlySpan<char> Current => _curRead;
 
         [MethodImpl(Opt.Inline)] public T Read<T>() => ReadNext().To<T, P>(_policy);
         [MethodImpl(Opt.Inline)] public bool TryRead<T>(out T result) => ReadNext().TryTo(out result, _policy);
@@ -141,29 +143,28 @@ namespace FerryKit.Core
         {
             _line = line;
             _policy = policy;
-            _lastRead = default;
+            _curRead = default;
             _curIdx = 0;
         }
 
         public ReadOnlySpan<char> ReadNext()
         {
             if (_curIdx >= _line.Length)
-                return ReadOnlySpan<char>.Empty;
+                return _curRead = ReadOnlySpan<char>.Empty;
 
             var remaining = _line[_curIdx..];
             int nextComma = remaining.IndexOfUnquoted(_policy.ColSep, _policy.EscapeMode);
             if (nextComma == -1)
             {
                 _curIdx = _line.Length;
-                _lastRead = remaining;
-                return _lastRead;
+                _curRead = remaining;
             }
             else
             {
                 _curIdx += nextComma + 1;
-                _lastRead = remaining[..nextComma];
-                return _lastRead;
+                _curRead = remaining[..nextComma];
             }
+            return _curRead;
         }
     }
 
@@ -173,16 +174,22 @@ namespace FerryKit.Core
     /// </summary>
     public static class ParseHelper
     {
+        public const char ColSep = ',';
+        public const char ArrSep = ';';
+        public const char DictSep = '|';
+        public const char PairSep = '=';
+        public const QuoteEscapeMode EscapeMode = QuoteEscapeMode.Csv;
+
         /// <summary>
         /// 런타임에 함수 인자로 전달될 때에 크기 0의 value type 인자로 취급. 오버헤드 최소화.
         /// </summary>
         public readonly struct Default : IParsePolicy
         {
-            public char ColSep => ',';
-            public char ArrSep => ';';
-            public char DictSep => '|';
-            public char PairSep => '=';
-            public QuoteEscapeMode EscapeMode => QuoteEscapeMode.Csv;
+            public char ColSep => ParseHelper.ColSep;
+            public char ArrSep => ParseHelper.ArrSep;
+            public char DictSep => ParseHelper.DictSep;
+            public char PairSep => ParseHelper.PairSep;
+            public QuoteEscapeMode EscapeMode => ParseHelper.EscapeMode;
         }
 
         /// <summary>
@@ -198,13 +205,18 @@ namespace FerryKit.Core
             public char PairSep { get; }
             public QuoteEscapeMode EscapeMode { get; }
 
-            public Custom(Default def)
+            public Custom(
+                char colSep = ParseHelper.ColSep,
+                char arrSep = ParseHelper.ArrSep,
+                char dictSep = ParseHelper.DictSep,
+                char pairSep = ParseHelper.PairSep,
+                QuoteEscapeMode escapeMode = ParseHelper.EscapeMode)
             {
-                ColSep = def.ColSep;
-                ArrSep = def.ArrSep;
-                DictSep = def.DictSep;
-                PairSep = def.PairSep;
-                EscapeMode = def.EscapeMode;
+                ColSep = colSep;
+                ArrSep = arrSep;
+                DictSep = dictSep;
+                PairSep = pairSep;
+                EscapeMode = escapeMode;
             }
         }
 
@@ -526,7 +538,7 @@ namespace FerryKit.Core
                 _ when IsGeneric(typeof(T), typeof(List<>)) => CreateParser(nameof(ToList), typeof(T).GetGenericArguments()[0], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(Dictionary<,>)) => CreateParser(nameof(ToDictionary), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(ValueTuple<,>)) => CreateParser(nameof(ToPair), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
-                _ => throw new ArgumentException($"no parser for {Parse}<{typeof(T).Name}>")
+                _ => throw new ArgumentException($"no parser for Parse<{typeof(T).Name}, {typeof(P).Name}>")
             };
 
             public static readonly TryParser<T, P> TryParse = typeof(T) switch
@@ -543,7 +555,7 @@ namespace FerryKit.Core
                 _ when IsGeneric(typeof(T), typeof(List<>)) => CreateTryParser(nameof(TryToList), typeof(T).GetGenericArguments()[0], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(Dictionary<,>)) => CreateTryParser(nameof(TryToDictionary), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(ValueTuple<,>)) => CreateTryParser(nameof(TryToPair), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
-                _ => throw new ArgumentException($"no parser for {TryParse}<{typeof(T).Name}>")
+                _ => throw new ArgumentException($"no parser for TryParse<{typeof(T).Name}, {typeof(P).Name}>")
             };
 
             private static Parser<T, P> CreateParser(string methodName, params Type[] typeArgs)
