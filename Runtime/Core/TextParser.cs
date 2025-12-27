@@ -16,15 +16,24 @@ namespace FerryKit.Core
         char ArrSep { get; }
         char DictSep { get; }
         char PairSep { get; }
+        bool IgnoreCase { get; }
         QuoteEscapeMode EscapeMode { get; }
     }
 
     /// <summary>
-    /// TextParser를 통해 파싱 가능한 객체 인터페이스
+    /// TextParser를 통해 파싱 가능한 객체 인터페이스 (파싱 과정에서 실패시 예외 던지는 방식)
     /// </summary>
     public interface IParsable
     {
-        bool Parse<P>(LineReader<P> reader) where P : struct, IParsePolicy;
+        void Parse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy;
+    }
+
+    /// <summary>
+    /// TextParser를 통해 파싱 가능한 객체 인터페이스 (파싱 과정에서 실패를 false 리턴으로 처리하는 방식
+    /// </summary>
+    public interface ITryParsable
+    {
+        bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy;
     }
 
     /// <summary>
@@ -34,39 +43,86 @@ namespace FerryKit.Core
     {
         private const int _estimateLengthPerLine = 50;
 
-
-        public static List<T> Load<T>(string text, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static List<T> Parse<T>(string text, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : IParsable, new()
-        {
-            return Load<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
-        }
+            => Parse<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
 
-        public static List<T> Load<T, P>(string text, P policy, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static bool TryParse<T, P>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : ITryParsable, new()
+            => TryParse<T, ParseHelper.Default>(text, default, out result, out reason, reserveLine, isSkipFirstLine);
+
+        public static List<T> Parse<T, P>(string text, P policy, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : IParsable, new()
             where P : struct, IParsePolicy
         {
             if (string.IsNullOrWhiteSpace(text))
                 return new();
 
-            var lineSplitter = LineSplitter<P>.From(text, policy);
+            var lineSplitter = new LineSplitter<P>(text, policy);
             if (isSkipFirstLine)
             {
                 lineSplitter.MoveNext();
             }
             var result = new List<T>(reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine);
+            var reader = new LineReader<P>(default, policy);
+            var line = lineSplitter.Current;
+            try
+            {
+                while (lineSplitter.MoveNext())
+                {
+                    line = lineSplitter.Current;
+                    if (line.IsWhiteSpace())
+                        continue;
+
+                    reader = new(line, policy);
+                    var data = ExpressionCache<T>.New();
+                    data.Parse(ref reader);
+                    result.Add(data);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new FormatException($"parse failed. line: {line.ToString()}, cell: {reader.Current.ToString()}, reason: {ex.Message}", ex);
+            }
+            return result;
+        }
+
+        public static bool TryParse<T, P>(string text, P policy, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : ITryParsable, new()
+            where P : struct, IParsePolicy
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                result = null;
+                reason = "input text is null or empty";
+                return false;
+            }
+            var lineSplitter = new LineSplitter<P>(text, policy);
+            if (isSkipFirstLine)
+            {
+                lineSplitter.MoveNext();
+            }
+            var ret = new List<T>(reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine);
+            var reader = new LineReader<P>(default, policy);
             foreach (var line in lineSplitter)
             {
                 if (line.IsWhiteSpace())
                     continue;
 
+                reader = new(line, policy);
                 var data = ExpressionCache<T>.New();
-                if (data.Parse(LineReader<P>.From(line, policy)))
+                if (data.TryParse(ref reader))
                 {
-                    result.Add(data);
+                    ret.Add(data);
+                    continue;
                 }
-                else throw new InvalidOperationException($"line parse failed. line: {line.ToString()}");
+                result = null;
+                reason = $"parse failed. line: {line.ToString()}, cell: {reader.Current.ToString()}";
+                return false;
             }
-            return result;
+            result = ret;
+            reason = null;
+            return true;
         }
     }
 
@@ -87,7 +143,6 @@ namespace FerryKit.Core
         }
 
         [MethodImpl(Opt.Inline)] public readonly LineSplitter<P> GetEnumerator() => this;
-        [MethodImpl(Opt.Inline)] public static LineSplitter<P> From(ReadOnlySpan<char> text, P policy) => new(text, policy);
 
         [MethodImpl(Opt.Inline)]
         public LineSplitter(ReadOnlySpan<char> text, P policy)
@@ -136,7 +191,6 @@ namespace FerryKit.Core
 
         [MethodImpl(Opt.Inline)] public T Read<T>() => ReadNext().To<T, P>(_policy);
         [MethodImpl(Opt.Inline)] public bool TryRead<T>(out T result) => ReadNext().TryTo(out result, _policy);
-        [MethodImpl(Opt.Inline)] public static LineReader<P> From(ReadOnlySpan<char> line, P policy) => new(line, policy);
 
         [MethodImpl(Opt.Inline)]
         public LineReader(ReadOnlySpan<char> line, P policy)
@@ -178,6 +232,7 @@ namespace FerryKit.Core
         public const char ArrSep = ';';
         public const char DictSep = '|';
         public const char PairSep = '=';
+        public const bool IgnoreCase = false;
         public const QuoteEscapeMode EscapeMode = QuoteEscapeMode.Csv;
 
         /// <summary>
@@ -189,6 +244,7 @@ namespace FerryKit.Core
             public char ArrSep => ParseHelper.ArrSep;
             public char DictSep => ParseHelper.DictSep;
             public char PairSep => ParseHelper.PairSep;
+            public bool IgnoreCase => ParseHelper.IgnoreCase;
             public QuoteEscapeMode EscapeMode => ParseHelper.EscapeMode;
         }
 
@@ -203,6 +259,7 @@ namespace FerryKit.Core
             public char ArrSep { get; }
             public char DictSep { get; }
             public char PairSep { get; }
+            public bool IgnoreCase { get; }
             public QuoteEscapeMode EscapeMode { get; }
 
             public Custom(
@@ -210,12 +267,14 @@ namespace FerryKit.Core
                 char arrSep = ParseHelper.ArrSep,
                 char dictSep = ParseHelper.DictSep,
                 char pairSep = ParseHelper.PairSep,
+                bool ignoreCase = ParseHelper.IgnoreCase,
                 QuoteEscapeMode escapeMode = ParseHelper.EscapeMode)
             {
                 ColSep = colSep;
                 ArrSep = arrSep;
                 DictSep = dictSep;
                 PairSep = pairSep;
+                IgnoreCase = ignoreCase;
                 EscapeMode = escapeMode;
             }
         }
@@ -229,9 +288,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static float ToFloat(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : float.Parse(s);
         [MethodImpl(Opt.Inline)] public static double ToDouble(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : double.Parse(s);
         [MethodImpl(Opt.Inline)] public static DateTime ToDateTime(this ReadOnlySpan<char> s) => s.IsEmpty ? default : DateTime.Parse(s);
-        [MethodImpl(Opt.Inline)] public static string ToStr(this ReadOnlySpan<char> s) => s.TrimQuotes().ToString();
-        [MethodImpl(Opt.Inline)] public static bool ToBool(this ReadOnlySpan<char> s) => s.TryParseForBit(out var r) ? r : bool.Parse(s);
-        [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.Parse<T>();
+        [MethodImpl(Opt.Inline)] public static string ToStr(this ReadOnlySpan<char> s) { var r = s.Trim().TrimQuotes().ToString(); return r.Contains("\"\"") ? r.Replace("\"\"", "\"") : r; }
+        [MethodImpl(Opt.Inline)] public static bool ToBool(this ReadOnlySpan<char> s) => s.Trim().TryParseForBit(out var r) ? r : bool.Parse(s);
+        [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.Parse<T>(default(Default).IgnoreCase);
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T>(this ReadOnlySpan<char> s) => s.ToArrayImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T>(this ReadOnlySpan<char> s) => s.ToListImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V>(this ReadOnlySpan<char> s) => s.ToPairImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
@@ -243,9 +302,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToFloat(this ReadOnlySpan<char> s, out float r) => float.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToDouble(this ReadOnlySpan<char> s, out double r) => double.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToDateTime(this ReadOnlySpan<char> s, out DateTime r) => DateTime.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToStr(this ReadOnlySpan<char> s, out string r) { r = s.TrimQuotes().ToStr(); return true; }
-        [MethodImpl(Opt.Inline)] public static bool TryToBool(this ReadOnlySpan<char> s, out bool r) => s.TryParseForBit(out r) || bool.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryParse(out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToStr(this ReadOnlySpan<char> s, out string r) { r = s.ToStr(); return true; }
+        [MethodImpl(Opt.Inline)] public static bool TryToBool(this ReadOnlySpan<char> s, out bool r) => s.Trim().TryParseForBit(out r) || bool.TryParse(s, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryParse(out r, default(Default).IgnoreCase);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T>(this ReadOnlySpan<char> s, out T[] r) => s.TryToArrayImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T>(this ReadOnlySpan<char> s, out List<T> r) => s.TryToListImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V>(this ReadOnlySpan<char> s, out (K, V) r) => s.TryToPairImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
@@ -259,7 +318,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static DateTime ToDateTime<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDateTime();
         [MethodImpl(Opt.Inline)] public static string ToStr<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToStr();
         [MethodImpl(Opt.Inline)] public static bool ToBool<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToBool();
-        [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy where T : struct, Enum => s.Parse<T>();
+        [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.Parse<T>(p.IgnoreCase);
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
@@ -273,7 +332,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToDateTime<P>(this ReadOnlySpan<char> s, out DateTime r, P _) where P : struct, IParsePolicy => s.TryToDateTime(out r);
         [MethodImpl(Opt.Inline)] public static bool TryToStr<P>(this ReadOnlySpan<char> s, out string r, P _) where P : struct, IParsePolicy => s.TryToStr(out r);
         [MethodImpl(Opt.Inline)] public static bool TryToBool<P>(this ReadOnlySpan<char> s, out bool r, P _) where P : struct, IParsePolicy => s.TryToBool(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P _) where P : struct, IParsePolicy where T : struct, Enum => s.TryParse(out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryParse(out r, p.IgnoreCase);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
