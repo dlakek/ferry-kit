@@ -47,7 +47,7 @@ namespace FerryKit.Core
             where T : IParsable, new()
             => Parse<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
 
-        public static bool TryParse<T, P>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static bool TryParse<T>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : ITryParsable, new()
             => TryParse<T, ParseHelper.Default>(text, default, out result, out reason, reserveLine, isSkipFirstLine);
 
