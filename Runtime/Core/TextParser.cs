@@ -47,9 +47,24 @@ namespace FerryKit.Core
             where T : IParsable, new()
             => Parse<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
 
+        public static bool TryParse<T>(string text, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : ITryParsable, new()
+            => TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine);
+
         public static bool TryParse<T>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : ITryParsable, new()
-            => TryParse<T, ParseHelper.Default>(text, default, out result, out reason, reserveLine, isSkipFirstLine);
+        {
+            result = new();
+            return TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine);
+        }
+
+        public static bool TryParse<T, P>(string text, P policy, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : ITryParsable, new()
+            where P : struct, IParsePolicy
+        {
+            result = new();
+            return TryParse(text, policy, result, out reason, reserveLine, isSkipFirstLine);
+        }
 
         public static List<T> Parse<T, P>(string text, P policy, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : IParsable, new()
@@ -87,13 +102,12 @@ namespace FerryKit.Core
             return result;
         }
 
-        public static bool TryParse<T, P>(string text, P policy, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static bool TryParse<T, P>(string text, P policy, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : ITryParsable, new()
             where P : struct, IParsePolicy
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                result = null;
                 reason = "input text is null or empty";
                 return false;
             }
@@ -102,7 +116,12 @@ namespace FerryKit.Core
             {
                 lineSplitter.MoveNext();
             }
-            var ret = new List<T>(reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine);
+            result.Clear();
+            int reserveSize = reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine;
+            if (result.Capacity < reserveSize)
+            {
+                result.Capacity = reserveSize;
+            }
             var reader = new LineReader<P>(default, policy);
             foreach (var line in lineSplitter)
             {
@@ -113,14 +132,12 @@ namespace FerryKit.Core
                 var data = ExpressionCache<T>.New();
                 if (data.TryParse(ref reader))
                 {
-                    ret.Add(data);
+                    result.Add(data);
                     continue;
                 }
-                result = null;
                 reason = $"parse failed. line: {line.ToString()}, cell: {reader.Current.ToString()}";
                 return false;
             }
-            result = ret;
             reason = null;
             return true;
         }
