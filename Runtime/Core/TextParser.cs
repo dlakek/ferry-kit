@@ -14,6 +14,7 @@ namespace FerryKit.Core
     {
         char ColSep { get; }
         char ArrSep { get; }
+        char SetSep { get; }
         char DictSep { get; }
         char PairSep { get; }
         bool IgnoreCase { get; }
@@ -228,12 +229,12 @@ namespace FerryKit.Core
             if (nextComma == -1)
             {
                 _curIdx = _line.Length;
-                _curRead = remaining;
+                _curRead = remaining.TrimQuotes();
             }
             else
             {
                 _curIdx += nextComma + 1;
-                _curRead = remaining[..nextComma];
+                _curRead = remaining[..nextComma].TrimQuotes();
             }
             return _curRead;
         }
@@ -247,6 +248,7 @@ namespace FerryKit.Core
     {
         public const char ColSep = ',';
         public const char ArrSep = ';';
+        public const char SetSep = '|';
         public const char DictSep = '|';
         public const char PairSep = '=';
         public const bool IgnoreCase = false;
@@ -259,6 +261,7 @@ namespace FerryKit.Core
         {
             public char ColSep => ParseHelper.ColSep;
             public char ArrSep => ParseHelper.ArrSep;
+            public char SetSep => ParseHelper.SetSep;
             public char DictSep => ParseHelper.DictSep;
             public char PairSep => ParseHelper.PairSep;
             public bool IgnoreCase => ParseHelper.IgnoreCase;
@@ -274,6 +277,7 @@ namespace FerryKit.Core
         {
             public char ColSep { get; }
             public char ArrSep { get; }
+            public char SetSep { get; }
             public char DictSep { get; }
             public char PairSep { get; }
             public bool IgnoreCase { get; }
@@ -282,6 +286,7 @@ namespace FerryKit.Core
             public Custom(
                 char colSep = ParseHelper.ColSep,
                 char arrSep = ParseHelper.ArrSep,
+                char setSep = ParseHelper.SetSep,
                 char dictSep = ParseHelper.DictSep,
                 char pairSep = ParseHelper.PairSep,
                 bool ignoreCase = ParseHelper.IgnoreCase,
@@ -289,6 +294,7 @@ namespace FerryKit.Core
             {
                 ColSep = colSep;
                 ArrSep = arrSep;
+                SetSep = setSep;
                 DictSep = dictSep;
                 PairSep = pairSep;
                 IgnoreCase = ignoreCase;
@@ -310,8 +316,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.Parse<T>(default(Default).IgnoreCase);
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T>(this ReadOnlySpan<char> s) => s.ToArrayImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T>(this ReadOnlySpan<char> s) => s.ToListImpl(Cache<T, Default>.Parse);
-        [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V>(this ReadOnlySpan<char> s) => s.ToPairImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
+        [MethodImpl(Opt.Inline)] public static HashSet<T> ToHashSet<T>(this ReadOnlySpan<char> s) => s.ToHashSetImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static Dictionary<K, V> ToDictionary<K, V>(this ReadOnlySpan<char> s) => s.ToDictionaryImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
+        [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V>(this ReadOnlySpan<char> s) => s.ToPairImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
 
         [MethodImpl(Opt.Inline)] public static bool TryTo<T>(this ReadOnlySpan<char> s, out T r) => Cache<T, Default>.TryParse(s, out r, default);
         [MethodImpl(Opt.Inline)] public static bool TryToInt(this ReadOnlySpan<char> s, out int r) => int.TryParse(s, out r);
@@ -324,8 +331,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryParse(out r, default(Default).IgnoreCase);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T>(this ReadOnlySpan<char> s, out T[] r) => s.TryToArrayImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T>(this ReadOnlySpan<char> s, out List<T> r) => s.TryToListImpl(out r, Cache<T, Default>.TryParse);
-        [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V>(this ReadOnlySpan<char> s, out (K, V) r) => s.TryToPairImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
+        [MethodImpl(Opt.Inline)] public static bool TryToHashSet<T>(this ReadOnlySpan<char> s, out HashSet<T> r) => s.TryToHashSetImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToDictionary<K, V>(this ReadOnlySpan<char> s, out Dictionary<K, V> r) => s.TryToDictionaryImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
+        [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V>(this ReadOnlySpan<char> s, out (K, V) r) => s.TryToPairImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
 
         [MethodImpl(Opt.Inline)] public static T To<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => Cache<T, P>.Parse(s, p);
         [MethodImpl(Opt.Inline)] public static int ToInt<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToInt();
@@ -338,8 +346,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.Parse<T>(p.IgnoreCase);
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] public static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static Dictionary<K, V> ToDictionary<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToDictionaryImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
 
         [MethodImpl(Opt.Inline)] public static bool TryTo<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy => Cache<T, P>.TryParse(s, out r, p);
         [MethodImpl(Opt.Inline)] public static bool TryToInt<P>(this ReadOnlySpan<char> s, out int r, P _) where P : struct, IParsePolicy => s.TryToInt(out r);
@@ -352,8 +361,9 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryParse(out r, p.IgnoreCase);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] public static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
 
         private static T[] ToArrayImpl<T, P>(this ReadOnlySpan<char> span, Parser<T, P> parser, P policy = default)
             where P : struct, IParsePolicy
@@ -461,21 +471,75 @@ namespace FerryKit.Core
             while (start < len)
             {
                 int idx = span.IndexOfUnquoted(sep, start, esc);
+                var sub = idx == -1 ? span[start..] : span[start..idx];
+                if (!parser(sub, out var parsed, policy))
+                    return false;
+
+                ret.Add(parsed);
                 if (idx == -1)
-                {
-                    if (!parser(span[start..], out var parsed, policy))
-                        return false;
-
-                    ret.Add(parsed);
                     break;
-                }
-                else
-                {
-                    if (!parser(span[start..idx], out var parsed, policy))
-                        return false;
 
-                    ret.Add(parsed);
-                }
+                start = idx + 1;
+            }
+            result = ret;
+            return true;
+        }
+
+        private static HashSet<T> ToHashSetImpl<T, P>(this ReadOnlySpan<char> span, Parser<T, P> parser, P policy = default)
+            where P : struct, IParsePolicy
+        {
+            if (span.IsEmpty || span.IsWhiteSpace())
+                return new();
+
+            var esc = policy.EscapeMode;
+            var sep = policy.DictSep;
+            int len = span.Length;
+            int num = span.CountByUnquotedSep(sep, esc);
+            var ret = new HashSet<T>(num);
+            int start = 0;
+            while (start < len)
+            {
+                int idx = span.IndexOfUnquoted(sep, start, esc);
+                var sub = idx == -1 ? span[start..] : span[start..idx];
+                if (!ret.Add(parser(sub, policy)))
+                    throw new Exception($"parsed value is dulicated in hash set. text: {sub.ToString()}");
+
+                if (idx == -1)
+                    break;
+
+                start = idx + 1;
+            }
+            return ret;
+        }
+
+        private static bool TryToHashSetImpl<T, P>(this ReadOnlySpan<char> span, out HashSet<T> result, TryParser<T, P> parser, P policy = default)
+            where P : struct, IParsePolicy
+        {
+            if (span.IsEmpty || span.IsWhiteSpace())
+            {
+                result = new();
+                return true;
+            }
+            result = null;
+            var esc = policy.EscapeMode;
+            var sep = policy.DictSep;
+            int len = span.Length;
+            int num = span.CountByUnquotedSep(sep, esc);
+            var ret = new HashSet<T>(num);
+            int start = 0;
+            while (start < len)
+            {
+                int idx = span.IndexOfUnquoted(sep, start, esc);
+                var sub = idx == -1 ? span[start..] : span[start..idx];
+                if (!parser(sub, out var parsed, policy))
+                    return false;
+
+                if (!ret.Add(parsed))
+                    return false;
+
+                if (idx == -1)
+                    break;
+
                 start = idx + 1;
             }
             result = ret;
@@ -612,6 +676,7 @@ namespace FerryKit.Core
                 _ when typeof(T).IsEnum => CreateParser(nameof(ToEnum), typeof(T), typeof(P)),
                 _ when typeof(T).IsArray => CreateParser(nameof(ToArray), typeof(T).GetElementType(), typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(List<>)) => CreateParser(nameof(ToList), typeof(T).GetGenericArguments()[0], typeof(P)),
+                _ when IsGeneric(typeof(T), typeof(HashSet<>)) => CreateParser(nameof(ToHashSet), typeof(T).GetGenericArguments()[0], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(Dictionary<,>)) => CreateParser(nameof(ToDictionary), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(ValueTuple<,>)) => CreateParser(nameof(ToPair), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ => throw new ArgumentException($"no parser for Parse<{typeof(T).Name}, {typeof(P).Name}>")
@@ -629,6 +694,7 @@ namespace FerryKit.Core
                 _ when typeof(T).IsEnum => CreateTryParser(nameof(TryToEnum), typeof(T), typeof(P)),
                 _ when typeof(T).IsArray => CreateTryParser(nameof(TryToArray), typeof(T).GetElementType(), typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(List<>)) => CreateTryParser(nameof(TryToList), typeof(T).GetGenericArguments()[0], typeof(P)),
+                _ when IsGeneric(typeof(T), typeof(HashSet<>)) => CreateTryParser(nameof(TryToHashSet), typeof(T).GetGenericArguments()[0], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(Dictionary<,>)) => CreateTryParser(nameof(TryToDictionary), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ when IsGeneric(typeof(T), typeof(ValueTuple<,>)) => CreateTryParser(nameof(TryToPair), typeof(T).GetGenericArguments()[0], typeof(T).GetGenericArguments()[1], typeof(P)),
                 _ => throw new ArgumentException($"no parser for TryParse<{typeof(T).Name}, {typeof(P).Name}>")
