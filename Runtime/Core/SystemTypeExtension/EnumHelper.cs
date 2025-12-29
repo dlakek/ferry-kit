@@ -39,6 +39,35 @@ namespace FerryKit.Core
             }
         }
 
+        /// <summary>
+        /// 제네릭 Enum에 대해 비트 OR 연산(|=)을 수행.
+        /// </summary>
+        [MethodImpl(Opt.Inline)]
+        public static void AccumulateFlag<T>(this ref T target, T next) where T : struct, Enum
+        {
+            // JIT가 T의 크기에 따라 죽은 코드를 제거하므로 런타임에는 조건 검사 없이 바로 해당 연산만 수행됨
+            if (Unsafe.SizeOf<T>() == 4) // int, uint (가장 흔함)
+            {
+                Unsafe.As<T, int>(ref target) |= Unsafe.As<T, int>(ref next);
+            }
+            else if (Unsafe.SizeOf<T>() == 8) // long, ulong
+            {
+                Unsafe.As<T, long>(ref target) |= Unsafe.As<T, long>(ref next);
+            }
+            else if (Unsafe.SizeOf<T>() == 1) // byte, sbyte
+            {
+                Unsafe.As<T, byte>(ref target) |= Unsafe.As<T, byte>(ref next);
+            }
+            else if (Unsafe.SizeOf<T>() == 2) // short, ushort
+            {
+                Unsafe.As<T, short>(ref target) |= Unsafe.As<T, short>(ref next);
+            }
+            else
+            {
+                throw new NotSupportedException($"Enum size {Unsafe.SizeOf<T>()} not supported");
+            }
+        }
+
         [MethodImpl(Opt.Inline)]
         public static T Parse<T>(this string str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {

@@ -313,7 +313,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static DateTime ToDateTime(this ReadOnlySpan<char> s) => s.IsEmpty ? default : DateTime.Parse(s);
         [MethodImpl(Opt.Inline)] public static string ToStr(this ReadOnlySpan<char> s) { var r = s.Trim().TrimQuotes().ToString(); return r.Contains("\"\"") ? r.Replace("\"\"", "\"") : r; }
         [MethodImpl(Opt.Inline)] public static bool ToBool(this ReadOnlySpan<char> s) => s.Trim().TryParseForBit(out var r) ? r : bool.Parse(s);
-        [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.Parse<T>(default(Default).IgnoreCase);
+        [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.ToEnumImpl<T, Default>();
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T>(this ReadOnlySpan<char> s) => s.ToArrayImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T>(this ReadOnlySpan<char> s) => s.ToListImpl(Cache<T, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static HashSet<T> ToHashSet<T>(this ReadOnlySpan<char> s) => s.ToHashSetImpl(Cache<T, Default>.Parse);
@@ -328,7 +328,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToDateTime(this ReadOnlySpan<char> s, out DateTime r) => DateTime.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToStr(this ReadOnlySpan<char> s, out string r) { r = s.ToStr(); return true; }
         [MethodImpl(Opt.Inline)] public static bool TryToBool(this ReadOnlySpan<char> s, out bool r) => s.Trim().TryParseForBit(out r) || bool.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryParse(out r, default(Default).IgnoreCase);
+        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryToEnumImpl<T, Default>(out r);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T>(this ReadOnlySpan<char> s, out T[] r) => s.TryToArrayImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T>(this ReadOnlySpan<char> s, out List<T> r) => s.TryToListImpl(out r, Cache<T, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToHashSet<T>(this ReadOnlySpan<char> s, out HashSet<T> r) => s.TryToHashSetImpl(out r, Cache<T, Default>.TryParse);
@@ -343,7 +343,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static DateTime ToDateTime<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDateTime();
         [MethodImpl(Opt.Inline)] public static string ToStr<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToStr();
         [MethodImpl(Opt.Inline)] public static bool ToBool<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToBool();
-        [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.Parse<T>(p.IgnoreCase);
+        [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.ToEnumImpl<T, P>(p);
         [MethodImpl(Opt.Inline)] public static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
         [MethodImpl(Opt.Inline)] public static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
@@ -358,12 +358,76 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToDateTime<P>(this ReadOnlySpan<char> s, out DateTime r, P _) where P : struct, IParsePolicy => s.TryToDateTime(out r);
         [MethodImpl(Opt.Inline)] public static bool TryToStr<P>(this ReadOnlySpan<char> s, out string r, P _) where P : struct, IParsePolicy => s.TryToStr(out r);
         [MethodImpl(Opt.Inline)] public static bool TryToBool<P>(this ReadOnlySpan<char> s, out bool r, P _) where P : struct, IParsePolicy => s.TryToBool(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryParse(out r, p.IgnoreCase);
+        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryToEnumImpl(out r, p);
         [MethodImpl(Opt.Inline)] public static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
         [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+
+        private static T ToEnumImpl<T, P>(this ReadOnlySpan<char> span, P policy = default)
+            where T : struct, Enum
+            where P : struct, IParsePolicy
+        {
+            if (span.IsEmpty || span.IsWhiteSpace())
+                throw new ArgumentException($"parse failed - text is empty.");
+
+            var sep = '|';
+            var esc = policy.EscapeMode;
+            var igc = policy.IgnoreCase;
+            int len = span.Length;
+            int num = span.CountByUnquotedSep(sep, esc);
+            if (num == 1)
+                return span.Parse<T>(igc);
+
+            T ret = default;
+            int start = 0;
+            while (start < len)
+            {
+                int idx = span.IndexOfUnquoted(sep, start, esc);
+                if (idx == -1)
+                {
+                    ret.AccumulateFlag(span[start..].Parse<T>(igc));
+                    break;
+                }
+                ret.AccumulateFlag(span[start..idx].Parse<T>(igc));
+                start = idx + 1;
+            }
+            return ret;
+        }
+
+        private static bool TryToEnumImpl<T, P>(this ReadOnlySpan<char> span, out T result, P policy = default)
+            where T : struct, Enum
+            where P : struct, IParsePolicy
+        {
+            result = default;
+            if (span.IsEmpty || span.IsWhiteSpace())
+                return false;
+
+            var sep = '|';
+            var esc = policy.EscapeMode;
+            var igc = policy.IgnoreCase;
+            int len = span.Length;
+            int num = span.CountByUnquotedSep(sep, esc);
+            if (num == 1)
+                return span.TryParse(out result, igc);
+
+            int start = 0;
+            while (start < len)
+            {
+                int idx = span.IndexOfUnquoted(sep, start, esc);
+                var sub = idx == -1 ? span[start..] : span[start..idx];
+                if (!sub.TryParse(out T parsed, igc))
+                    return false;
+
+                result.AccumulateFlag(parsed);
+                if (idx == -1)
+                    break;
+
+                start = idx + 1;
+            }
+            return true;
+        }
 
         private static T[] ToArrayImpl<T, P>(this ReadOnlySpan<char> span, Parser<T, P> parser, P policy = default)
             where P : struct, IParsePolicy
@@ -492,7 +556,7 @@ namespace FerryKit.Core
                 return new();
 
             var esc = policy.EscapeMode;
-            var sep = policy.DictSep;
+            var sep = policy.SetSep;
             int len = span.Length;
             int num = span.CountByUnquotedSep(sep, esc);
             var ret = new HashSet<T>(num);
@@ -502,7 +566,7 @@ namespace FerryKit.Core
                 int idx = span.IndexOfUnquoted(sep, start, esc);
                 var sub = idx == -1 ? span[start..] : span[start..idx];
                 if (!ret.Add(parser(sub, policy)))
-                    throw new Exception($"parsed value is dulicated in hash set. text: {sub.ToString()}");
+                    throw new ArgumentException($"parsed value is dulicated in hash set. text: {sub.ToString()}");
 
                 if (idx == -1)
                     break;
@@ -522,7 +586,7 @@ namespace FerryKit.Core
             }
             result = null;
             var esc = policy.EscapeMode;
-            var sep = policy.DictSep;
+            var sep = policy.SetSep;
             int len = span.Length;
             int num = span.CountByUnquotedSep(sep, esc);
             var ret = new HashSet<T>(num);
