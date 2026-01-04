@@ -306,6 +306,10 @@ namespace FerryKit.Core
         public delegate bool TryParser<T, P>(ReadOnlySpan<char> span, out T result, P policy) where P : struct, IParsePolicy;
 
         [MethodImpl(Opt.Inline)] public static T To<T>(this ReadOnlySpan<char> s) => Cache<T, Default>.Parse(s, default);
+        [MethodImpl(Opt.Inline)] public static T To<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => Cache<T, P>.Parse(s, p);
+        [MethodImpl(Opt.Inline)] public static bool TryTo<T>(this ReadOnlySpan<char> s, out T r) => Cache<T, Default>.TryParse(s, out r, default);
+        [MethodImpl(Opt.Inline)] public static bool TryTo<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy => Cache<T, P>.TryParse(s, out r, p);
+
         [MethodImpl(Opt.Inline)] public static int ToInt(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : int.Parse(s);
         [MethodImpl(Opt.Inline)] public static long ToLong(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : long.Parse(s);
         [MethodImpl(Opt.Inline)] public static float ToFloat(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : float.Parse(s);
@@ -320,7 +324,6 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static Dictionary<K, V> ToDictionary<K, V>(this ReadOnlySpan<char> s) => s.ToDictionaryImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V>(this ReadOnlySpan<char> s) => s.ToPairImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
 
-        [MethodImpl(Opt.Inline)] public static bool TryTo<T>(this ReadOnlySpan<char> s, out T r) => Cache<T, Default>.TryParse(s, out r, default);
         [MethodImpl(Opt.Inline)] public static bool TryToInt(this ReadOnlySpan<char> s, out int r) => int.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToLong(this ReadOnlySpan<char> s, out long r) => long.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToFloat(this ReadOnlySpan<char> s, out float r) => float.TryParse(s, out r);
@@ -335,35 +338,33 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryToDictionary<K, V>(this ReadOnlySpan<char> s, out Dictionary<K, V> r) => s.TryToDictionaryImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
         [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V>(this ReadOnlySpan<char> s, out (K, V) r) => s.TryToPairImpl(out r, Cache<K, Default>.TryParse, Cache<V, Default>.TryParse);
 
-        [MethodImpl(Opt.Inline)] public static T To<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => Cache<T, P>.Parse(s, p);
-        [MethodImpl(Opt.Inline)] public static int ToInt<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToInt();
-        [MethodImpl(Opt.Inline)] public static long ToLong<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToLong();
-        [MethodImpl(Opt.Inline)] public static float ToFloat<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToFloat();
-        [MethodImpl(Opt.Inline)] public static double ToDouble<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDouble();
-        [MethodImpl(Opt.Inline)] public static DateTime ToDateTime<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDateTime();
-        [MethodImpl(Opt.Inline)] public static string ToStr<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToStr();
-        [MethodImpl(Opt.Inline)] public static bool ToBool<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToBool();
-        [MethodImpl(Opt.Inline)] public static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.ToEnumImpl<T, P>(p);
-        [MethodImpl(Opt.Inline)] public static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] public static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] public static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] public static Dictionary<K, V> ToDictionary<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToDictionaryImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] private static int ToInt<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToInt();
+        [MethodImpl(Opt.Inline)] private static long ToLong<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToLong();
+        [MethodImpl(Opt.Inline)] private static float ToFloat<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToFloat();
+        [MethodImpl(Opt.Inline)] private static double ToDouble<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDouble();
+        [MethodImpl(Opt.Inline)] private static DateTime ToDateTime<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDateTime();
+        [MethodImpl(Opt.Inline)] private static string ToStr<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToStr();
+        [MethodImpl(Opt.Inline)] private static bool ToBool<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToBool();
+        [MethodImpl(Opt.Inline)] private static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.ToEnumImpl<T, P>(p);
+        [MethodImpl(Opt.Inline)] private static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] private static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] private static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] private static Dictionary<K, V> ToDictionary<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToDictionaryImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [MethodImpl(Opt.Inline)] private static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
 
-        [MethodImpl(Opt.Inline)] public static bool TryTo<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy => Cache<T, P>.TryParse(s, out r, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToInt<P>(this ReadOnlySpan<char> s, out int r, P _) where P : struct, IParsePolicy => s.TryToInt(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToLong<P>(this ReadOnlySpan<char> s, out long r, P _) where P : struct, IParsePolicy => s.TryToLong(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToFloat<P>(this ReadOnlySpan<char> s, out float r, P _) where P : struct, IParsePolicy => s.TryToFloat(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToDouble<P>(this ReadOnlySpan<char> s, out double r, P _) where P : struct, IParsePolicy => s.TryToDouble(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToDateTime<P>(this ReadOnlySpan<char> s, out DateTime r, P _) where P : struct, IParsePolicy => s.TryToDateTime(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToStr<P>(this ReadOnlySpan<char> s, out string r, P _) where P : struct, IParsePolicy => s.TryToStr(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToBool<P>(this ReadOnlySpan<char> s, out bool r, P _) where P : struct, IParsePolicy => s.TryToBool(out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryToEnumImpl(out r, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] public static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToInt<P>(this ReadOnlySpan<char> s, out int r, P _) where P : struct, IParsePolicy => s.TryToInt(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToLong<P>(this ReadOnlySpan<char> s, out long r, P _) where P : struct, IParsePolicy => s.TryToLong(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToFloat<P>(this ReadOnlySpan<char> s, out float r, P _) where P : struct, IParsePolicy => s.TryToFloat(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToDouble<P>(this ReadOnlySpan<char> s, out double r, P _) where P : struct, IParsePolicy => s.TryToDouble(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToDateTime<P>(this ReadOnlySpan<char> s, out DateTime r, P _) where P : struct, IParsePolicy => s.TryToDateTime(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToStr<P>(this ReadOnlySpan<char> s, out string r, P _) where P : struct, IParsePolicy => s.TryToStr(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToBool<P>(this ReadOnlySpan<char> s, out bool r, P _) where P : struct, IParsePolicy => s.TryToBool(out r);
+        [MethodImpl(Opt.Inline)] private static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryToEnumImpl(out r, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [MethodImpl(Opt.Inline)] private static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
 
         private static T ToEnumImpl<T, P>(this ReadOnlySpan<char> span, P policy = default)
             where T : struct, Enum
@@ -764,6 +765,45 @@ namespace FerryKit.Core
                 _ => throw new ArgumentException($"no parser for TryParse<{typeof(T).Name}, {typeof(P).Name}>")
             };
 
+            static Cache()
+            {
+                // prevent code stripping
+                var tmpP = default(P);
+                var tmpS = "".AsSpan();
+                try
+                {
+                    tmpS.ToInt(tmpP);
+                    tmpS.ToLong(tmpP);
+                    tmpS.ToFloat(tmpP);
+                    tmpS.ToDouble(tmpP);
+                    tmpS.ToDateTime(tmpP);
+                    tmpS.ToStr(tmpP);
+                    tmpS.ToBool(tmpP);
+                    tmpS.ToEnum<QuoteEscapeMode, P>(tmpP);
+                    tmpS.ToArray<int, P>(tmpP);
+                    tmpS.ToList<int, P>(tmpP);
+                    tmpS.ToHashSet<int, P>(tmpP);
+                    tmpS.ToDictionary<int, int, P>(tmpP);
+                    tmpS.ToPair<int, int, P>(tmpP);
+                    tmpS.TryToInt(out var _, tmpP);
+                    tmpS.TryToLong(out var _, tmpP);
+                    tmpS.TryToFloat(out var _, tmpP);
+                    tmpS.TryToDouble(out var _, tmpP);
+                    tmpS.TryToDateTime(out var _, tmpP);
+                    tmpS.TryToStr(out var _, tmpP);
+                    tmpS.TryToBool(out var _, tmpP);
+                    tmpS.TryToEnum<QuoteEscapeMode, P>(out var _, tmpP);
+                    tmpS.TryToArray<int, P>(out var _, tmpP);
+                    tmpS.TryToList<int, P>(out var _, tmpP);
+                    tmpS.TryToHashSet<int, P>(out var _, tmpP);
+                    tmpS.TryToDictionary<int, int, P>(out var _, tmpP);
+                    tmpS.TryToPair<int, int, P>(out var _, tmpP);
+                }
+                catch
+                {
+                }
+            }
+
             private static Parser<T, P> CreateParser(string methodName, params Type[] typeArgs)
             {
                 var method = FindParserMethod(methodName, 2, false);
@@ -808,6 +848,6 @@ namespace FerryKit.Core
             private static bool IsGeneric(Type type, Type genericDef) => type.IsGenericType && type.GetGenericTypeDefinition() == genericDef;
         }
 
-        private static readonly MethodInfo[] Methods = typeof(ParseHelper).GetMethods(BindingFlags.Public | BindingFlags.Static);
+        private static readonly MethodInfo[] Methods = typeof(ParseHelper).GetMethods(BindingFlags.NonPublic | BindingFlags.Static);
     }
 }
