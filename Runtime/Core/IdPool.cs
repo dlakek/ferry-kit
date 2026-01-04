@@ -8,13 +8,13 @@ namespace FerryKit.Core
     public interface IIdPool<T>
     {
         T NextId();
-        void ReleaseId(T id); // CircularPool에서는 무시됨
+        void ReleaseId(T id); // Ignored in CircularPool
     }
 
     /// <summary>
-    /// 범위 내에서 ID를 순환하며 할당하는 ID 풀 구현체.
-    /// 범위 끝에 도달하면 다시 시작ID부터 할당을 시작함.
-    /// 앞서 할당한 ID의 생명주기가 짧음이 보장되어 시작ID로 돌아가도 충돌이 없을 것으로 예상되는 경우에 적합.
+    /// An ID pool implementation that allocates IDs in a circular fashion within a range.
+    /// When the range ends, allocation begins again from the starting ID.
+    /// This is suitable when previously allocated IDs are guaranteed to have short lifetimes and returning to the starting ID is expected to be free of conflicts.
     /// </summary>
     public class CircularIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -46,13 +46,13 @@ namespace FerryKit.Core
             ? _curId = _startId
             : _op.Inc(ref _curId);
 
-        public void ReleaseId(T id) { } // 구현 불필요
+        public void ReleaseId(T id) { } // No need to implement
     }
 
     /// <summary>
-    /// 범위 내에서 ID를 할당하고, 사용 완료한 ID를 돌려받아 재활용 가능한 ID 풀 구현체.
-    /// 범위 내의 모든 ID가 사용 중일 때는 더 이상 할당할 수 없음.
-    /// 할당된 ID의 생명주기가 길거나 불확실한 경우에 적합.
+    /// An ID pool implementation that allocates IDs within a scope and returns used IDs, allowing them to be recycled.
+    /// No more IDs can be allocated when all IDs within the scope are in use.
+    /// Suitable for cases where the lifetime of allocated IDs is long or uncertain.
     /// </summary>
     public class RecyclableIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -102,9 +102,9 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// RecyclableIdPool과 동일한 역할이지만, BitArray를 사용하여 ID 할당 상태를 추적하는 ID 풀 구현체.
-    /// RecyclableIdPool보다 메모리 사용량을 최대한 최적화하려는 경우에 적합.
-    /// 할당된 상태로 유지될 ID 양이 적당히 적을 것으로 예상되는 경우에만 사용하는 것이 좋음.
+    /// An ID pool implementation that serves the same purpose as RecyclableIdPool, but uses a BitArray to track ID allocation status.
+    /// Suitable for those seeking to optimize memory usage as much as possible compared to RecyclableIdPool.
+    /// Recommended only when the number of IDs expected to remain allocated is expected to be relatively small.
     /// </summary>
     public class BitArrayIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -138,7 +138,7 @@ namespace FerryKit.Core
 
         public T NextId()
         {
-            // 기본적으로 O(1)에 수렴하며 최악의 경우 O(n)의 시간 복잡도를 가짐
+            // Basically, it converges to O(1) and has a time complexity of O(n) in the worst case.
             int idx = _curIdx;
             for (int i = 0; i < _capacity; ++i)
             {

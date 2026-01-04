@@ -4,8 +4,8 @@ using System.Runtime.CompilerServices;
 namespace FerryKit.Core
 {
     /// <summary>
-    /// 숫자 연산 추상화 (구조체 제약을 통해 가상 함수 호출 및 박싱 발생 제거 가능)
-    /// 추후 유니티에서 C# 11 이상 지원시 언어 자체에서 제공하는 INumber로 대체
+    /// Abstraction of numeric operations (virtual function calls and boxing can be eliminated through struct constraints)
+    /// When Unity supports C# 11 or later, it will be replaced with the language-specific INumber.
     /// </summary>
     public interface INumOp<T>
     {
@@ -84,7 +84,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public readonly int ToInt(uint a) => a > int.MaxValue ? Throw(a) : (int)a;
         [MethodImpl(Opt.Inline)] public readonly uint FromInt(int a) => a < 0 ? Throw(a) : (uint)a;
 
-        // ToInt 함수의 인라인 최적화를 방해하지 않도록 throw 구문을 별도 함수로 분리
+        // Separate the throw statement into a separate function to avoid interfering with the inlining optimization of the ToInt function.
         private static int Throw(uint a) => throw new ArgumentOutOfRangeException(nameof(a), $"arg {a} is out of bounds.");
         private static uint Throw(int a) => throw new ArgumentOutOfRangeException(nameof(a), $"arg {a} is out of bounds.");
     }

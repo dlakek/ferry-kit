@@ -382,8 +382,9 @@ namespace FerryKit.Core
                 value = -value;
                 count = 1;
             }
+            // In case of font size input, it is usually smaller than 100, so it is intentionally written like this instead of binary search branch.
             if (value < 10) return count + 1;
-            if (value < 100) return count + 2; // 폰트 사이즈 입력의 경우 보통 이보다 작으므로 일부러 이진탐색 분기 대신 이렇게 작성
+            if (value < 100) return count + 2;
             if (value < 1000) return count + 3;
             if (value < 10000) return count + 4;
             if (value < 100000) return count + 5;
@@ -395,34 +396,34 @@ namespace FerryKit.Core
         }
 
         // ---------------------------------------------------------------------
-        // RichText 태그 구조 상수 (컴파일 타임 계산용)
-        // 정적 클래스로 그룹화하여 가독성 향상 및 네임스페이스 오염 방지
+        // RichText tag structural constants (for compile-time calculations)
+        // Grouping them into a static class improves readability and prevents namespace pollution.
         // ---------------------------------------------------------------------
         private static class Tag
         {
-            // 기본 구성 요소 길이
+            // Base component length
             public const int Open = 1;          // '<'
             public const int Close = 1;         // '>'
             public const int Slash = 1;         // '/'
             public const int Eq = 1;            // '='
             public const int HexRgb = 6;        // "RRGGBB"
 
-            // 1. 단일 문자 태그: <t>...</t>
+            // 1. single character tag: <t>...</t>
             public const int CharTagPrefixLen = Open + 1 + Close;           // "<t>".Length
             public const int CharTagSuffixLen = Open + Slash + 1 + Close;   // "</t>".Length
             public const int CharTagLen = CharTagPrefixLen + CharTagSuffixLen;
 
-            // 1. 문자열 태그: <tag>...</tag> (tag 길이 제외)
+            // 1. string tag: <tag>...</tag> (Excluding tag length)
             public const int StrTagPrefixLen = Open + Close;           // "<>".Length
             public const int StrTagSuffixLen = Open + Slash + Close;   // "</>".Length
             public const int StrTagLen = StrTagPrefixLen + StrTagSuffixLen;
 
-            // 3. 속성 태그: <tag=value>...</tag> (tag, value 길이 제외)
+            // 3. attribute tag: <tag=value>...</tag> (Excluding tag and value length)
             public const int AttrTagPrefixLen = Open + Eq + Close;      // "<=>".Length
             public const int AttrTagSuffixLen = Open + Slash + Close;   // "</>".Length
             public const int AttrTagLen = AttrTagPrefixLen + AttrTagSuffixLen;
 
-            // 4. Color 태그: <color=#RRGGBB>...</color>
+            // 4. Color tag: <color=#RRGGBB>...</color>
             public const string ColorHexPrefix = "<color=#";
             public const string ColorSuffix = "</color>";
             public const int ColorHexPrefixLen = 8; // "<color=#".Length

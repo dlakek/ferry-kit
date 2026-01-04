@@ -8,7 +8,7 @@ using static FerryKit.Core.StringHelper;
 namespace FerryKit.Core
 {
     /// <summary>
-    /// 구조체 제약을 통해 오버헤드 없이 필요시에만 Config를 전달할 수 있도록 하기 위한 인터페이스
+    /// Interface to allow passing Config only when needed without overhead through structure constraints.
     /// </summary>
     public interface IParsePolicy
     {
@@ -22,7 +22,7 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// TextParser를 통해 파싱 가능한 객체 인터페이스 (파싱 과정에서 실패시 예외 던지는 방식)
+    /// An object interface that can be parsed via TextParser (throwing an exception when parsing fails)
     /// </summary>
     public interface IParsable
     {
@@ -30,7 +30,7 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// TextParser를 통해 파싱 가능한 객체 인터페이스 (파싱 과정에서 실패를 false 리턴으로 처리하는 방식
+    /// An object interface that can be parsed through TextParser(how to handle failures during the parsing process by returning false)
     /// </summary>
     public interface ITryParsable
     {
@@ -38,7 +38,7 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// 기본적으로 CSV 파싱을 위해 사용되지만, 다른 형태의 텍스트도 파싱할 수 있도록 구현된 범용 파서
+    /// A general-purpose parser primarily used for CSV parsing, but implemented to be able to parse other forms of text as well.
     /// </summary>
     public static class TextParser
     {
@@ -145,7 +145,7 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// 전달받은 문자열을 한 줄씩 읽어나가는 구조체
+    /// A structure that reads the received string line by line
     /// </summary>
     public ref struct LineSplitter<P> where P : struct, IParsePolicy
     {
@@ -194,7 +194,7 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// LineSplitter로 분리한 각 줄에 대한 파싱을 담당하는 구조체
+    /// A structure responsible for parsing each line separated by LineSplitter.
     /// </summary>
     public ref struct LineReader<P> where P : struct, IParsePolicy
     {
@@ -241,8 +241,8 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// Span 기반 파싱을 돕는 정적 헬퍼 클래스
-    /// LineReader에서 쓰기 위해 만들었지만, 범용적으로 사용도 가능하게 구현함
+    /// A static helper class that facilitates Span-based parsing.
+    /// Created for use with LineReader, but implemented for general use.
     /// </summary>
     public static class ParseHelper
     {
@@ -255,7 +255,7 @@ namespace FerryKit.Core
         public const QuoteEscapeMode EscapeMode = QuoteEscapeMode.Csv;
 
         /// <summary>
-        /// 런타임에 함수 인자로 전달될 때에 크기 0의 value type 인자로 취급. 오버헤드 최소화.
+        /// When passed as a function argument at runtime, it is treated as a value type argument of size 0, minimizing overhead.
         /// </summary>
         public readonly struct Default : IParsePolicy
         {
@@ -269,9 +269,9 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// 런타임에 함수 인자로 전달될 때에 필드 만큼의 크기를 가진 value type 인자로 취급
-        /// 런타임에 설정을 커스텀하여 파싱 시작하려는 경우는 이 구조체를 사용하면 되고,
-        /// 컴파일 타임에 결정 가능한 커스텀인 경우는 위의 Default 처럼 IParsePolicy 상속 구조체를 추가하여 사용하면 된다.
+        /// When passed as a function argument at runtime, it is treated as a value type argument with the size of the field.
+        /// If you want to start parsing by customizing settings at runtime, use this structure.
+        /// If you want to customize settings that can be determined at compile time, use the IParsePolicy inheritance structure, as in Default above.
         /// </summary>
         public readonly struct Custom : IParsePolicy
         {
@@ -725,7 +725,7 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// 각 특수화된 타입 별로 최초 1회씩만 리플렉션을 통한 캐싱
+        /// Caching via reflection only once for each specialized type
         /// </summary>
         private static class Cache<T, P> where P : struct, IParsePolicy
         {

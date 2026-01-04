@@ -40,13 +40,14 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// 제네릭 Enum에 대해 비트 OR 연산(|=)을 수행.
+        /// Bitwise OR operation (|=) for generic enums
         /// </summary>
         [MethodImpl(Opt.Inline)]
         public static void AccumulateFlag<T>(this ref T target, T next) where T : struct, Enum
         {
-            // JIT가 T의 크기에 따라 죽은 코드를 제거하므로 런타임에는 조건 검사 없이 바로 해당 연산만 수행됨
-            if (Unsafe.SizeOf<T>() == 4) // int, uint (가장 흔함)
+            // Since JIT removes dead code based on the size of T,
+            // only the corresponding operation is performed at runtime without condition checking.
+            if (Unsafe.SizeOf<T>() == 4) // int, uint
             {
                 Unsafe.As<T, int>(ref target) |= Unsafe.As<T, int>(ref next);
             }
@@ -87,7 +88,7 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// Enum.TryParse보다 훨씬 최적화된 파싱 함수
+        /// A parsing function that is much more optimized than Enum.TryParse
         /// </summary>
         public static bool TryParse<T>(this string str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
@@ -105,15 +106,17 @@ namespace FerryKit.Core
             if (map.TryGetValue(str, out result))
                 return true;
 
-            // ignoreSpace인 경우 str.Trim()해서 체크해야 하는데, GC 발생을 피하기 위해 Span버전으로 넘겨서 처리한다.
+            // In case of ignoreSpace, str.Trim() should be used to check,
+            // but to avoid GC occurrence, it is passed on to the Span version and processed.
             return ignoreSpace
                 ? str.AsSpan().TryParse(out result, ignoreCase, ignoreSpace)
                 : str.AsSpan().TryParseFromIntForm(out result);
         }
 
         /// <summary>
-        /// Span버전은 GC 발생 안되는 것을 최우선으로 하기 때문에
-        /// Dictionary으로 탐색 불가능하여 선형탐색으로 찾는다. (추후 .NET 9의 AlternateLookup 사용 가능해지면 수정 필요)
+        /// Since the Span version prioritizes preventing GC,
+        /// it cannot be searched using a dictionary, so it uses linear search.
+        /// (This will need to be modified when AlternateLookup in .NET 9 becomes available.)
         /// </summary>
         public static bool TryParse<T>(this ReadOnlySpan<char> str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
@@ -142,7 +145,8 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// "1"과 같이 숫자값인 문자열을 받았을 때, enum의 실제값 중 일치하는 값이 있다면 변환해준다.
+        /// When a string with a numeric value such as "1" is received,
+        /// it is converted if there is a matching value among the actual values ​​of the enum.
         /// </summary>
         [MethodImpl(Opt.Inline)]
         private static bool TryParseFromIntForm<T>(this ReadOnlySpan<char> str, out T result) where T : struct, Enum
@@ -183,9 +187,9 @@ namespace FerryKit.Core
                 {
                     var val = Values[i];
                     var name = Names[i];
-                    IntValues[i] = (int)(object)val; // 최초 1회 파싱이므로 박싱 발생해도 괜찮다.
+                    IntValues[i] = (int)(object)val; // Since this is the first parsing, it is okay if boxing occurs.
                     StringMap.Add(name, val);
-                    StringMapIgnoreCase.TryAdd(name, val); // ignore case 중복 허용 (첫 번째 값 우선)
+                    StringMapIgnoreCase.TryAdd(name, val); // ignore case allows duplicates (first value takes precedence)
                 }
             }
         }
