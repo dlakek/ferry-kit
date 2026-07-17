@@ -137,15 +137,39 @@ namespace FerryKit
     /// FixedArray item fields must remain contiguous, ordered, and of the same unmanaged type.
     /// StructLayout.Sequential plus the editor layout test protects this Unsafe.Add contract.
     /// </summary>
-    internal static class FixedArrayHelper
+    public static class FixedArrayHelper
     {
         [MethodImpl(Opt.Inline)]
-        public static T Get<T>(in T first, uint count, uint capacity, uint index) where T : unmanaged
+        public static bool TryRead<T>(this ref LineReader reader, ref FixedArray2<T> result) where T : unmanaged => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T>(this ref LineReader reader, ref FixedArray3<T> result) where T : unmanaged => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T>(this ref LineReader reader, ref FixedArray4<T> result) where T : unmanaged => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T>(this ref LineReader reader, ref FixedArray5<T> result) where T : unmanaged => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T, P>(this ref LineReader<P> reader, ref FixedArray2<T> result) where T : unmanaged where P : struct, IParsePolicy => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T, P>(this ref LineReader<P> reader, ref FixedArray3<T> result) where T : unmanaged where P : struct, IParsePolicy => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T, P>(this ref LineReader<P> reader, ref FixedArray4<T> result) where T : unmanaged where P : struct, IParsePolicy => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryRead<T, P>(this ref LineReader<P> reader, ref FixedArray5<T> result) where T : unmanaged where P : struct, IParsePolicy => result.TryParse(ref reader);
+
+        [MethodImpl(Opt.Inline)]
+        internal static T Get<T>(in T first, uint count, uint capacity, uint index) where T : unmanaged
             => index < count && index < capacity
             ? Unsafe.Add(ref Unsafe.AsRef(in first), index)
             : default;
 
-        public static bool TryParse<T, P>(ReadOnlySpan<char> value, P policy, uint capacity, ref uint count, ref T first)
+        internal static bool TryParse<T, P>(ReadOnlySpan<char> value, P policy, uint capacity, ref uint count, ref T first)
             where T : unmanaged
             where P : struct, IParsePolicy
         {
