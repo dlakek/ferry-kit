@@ -249,6 +249,7 @@ namespace FerryKit.Core
 
         public readonly ReadOnlySpan<char> Line => _line;
         public readonly ReadOnlySpan<char> Current => _curRead;
+        public readonly P Policy => _policy;
 
         [MethodImpl(Opt.Inline)] public T Read<T>() => ReadNext().To<T, P>(_policy);
         [MethodImpl(Opt.Inline)] public bool TryRead<T>(out T result) => ReadNext().TryTo(out result, _policy);
