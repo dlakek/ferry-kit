@@ -13,7 +13,7 @@ namespace FerryKit.Core
         public static int Count<T>() where T : struct, Enum => Cache<T>.Count;
 
         [MethodImpl(Opt.Inline)]
-        public static bool IsDefined<T>(T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
+        public static bool IsDefined<T>(this T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
 
         [MethodImpl(Opt.Inline)]
         public static bool TrueForAll<T>(Predicate<T> match) where T : struct, Enum
@@ -45,28 +45,29 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void AccumulateFlag<T>(this ref T target, T next) where T : struct, Enum
         {
-            // Since JIT removes dead code based on the size of T,
-            // only the corresponding operation is performed at runtime without condition checking.
-            if (Unsafe.SizeOf<T>() == 4) // int, uint
+            // The storage size is constant for each closed generic enum type,
+            // enabling JIT/AOT compilers to fold the switch to the matching operation.
+            _ = Unsafe.SizeOf<T>() switch
             {
-                Unsafe.As<T, int>(ref target) |= Unsafe.As<T, int>(ref next);
-            }
-            else if (Unsafe.SizeOf<T>() == 8) // long, ulong
+                sizeof(byte) => Unsafe.As<T, byte>(ref target) |= Unsafe.As<T, byte>(ref next),
+                sizeof(ushort) => Unsafe.As<T, ushort>(ref target) |= Unsafe.As<T, ushort>(ref next),
+                sizeof(uint) => Unsafe.As<T, uint>(ref target) |= Unsafe.As<T, uint>(ref next),
+                sizeof(ulong) => Unsafe.As<T, ulong>(ref target) |= Unsafe.As<T, ulong>(ref next),
+                _ => throw CreateUnsupportedEnumSizeException<T>(Unsafe.SizeOf<T>()),
+            };
+        }
+
+        [MethodImpl(Opt.Inline)]
+        public static ulong ToUInt64Bits<T>(T value) where T : struct, Enum
+        {
+            return Unsafe.SizeOf<T>() switch
             {
-                Unsafe.As<T, long>(ref target) |= Unsafe.As<T, long>(ref next);
-            }
-            else if (Unsafe.SizeOf<T>() == 1) // byte, sbyte
-            {
-                Unsafe.As<T, byte>(ref target) |= Unsafe.As<T, byte>(ref next);
-            }
-            else if (Unsafe.SizeOf<T>() == 2) // short, ushort
-            {
-                Unsafe.As<T, short>(ref target) |= Unsafe.As<T, short>(ref next);
-            }
-            else
-            {
-                throw new NotSupportedException($"Enum size {Unsafe.SizeOf<T>()} not supported");
-            }
+                sizeof(byte) => Unsafe.As<T, byte>(ref value),
+                sizeof(ushort) => Unsafe.As<T, ushort>(ref value),
+                sizeof(uint) => Unsafe.As<T, uint>(ref value),
+                sizeof(ulong) => Unsafe.As<T, ulong>(ref value),
+                _ => throw CreateUnsupportedEnumSizeException<T>(Unsafe.SizeOf<T>()),
+            };
         }
 
         [MethodImpl(Opt.Inline)]
@@ -110,7 +111,7 @@ namespace FerryKit.Core
             // but to avoid GC occurrence, it is passed on to the Span version and processed.
             return ignoreSpace
                 ? str.AsSpan().TryParse(out result, ignoreCase, ignoreSpace)
-                : str.AsSpan().TryParseFromIntForm(out result);
+                : str.AsSpan().TryParseFromNumericForm(out result);
         }
 
         /// <summary>
@@ -141,7 +142,7 @@ namespace FerryKit.Core
                     return true;
                 }
             }
-            return span.TryParseFromIntForm(out result);
+            return span.TryParseFromNumericForm(out result);
         }
 
         /// <summary>
@@ -149,11 +150,11 @@ namespace FerryKit.Core
         /// it is converted if there is a matching value among the actual values ​​of the enum.
         /// </summary>
         [MethodImpl(Opt.Inline)]
-        private static bool TryParseFromIntForm<T>(this ReadOnlySpan<char> str, out T result) where T : struct, Enum
+        private static bool TryParseFromNumericForm<T>(this ReadOnlySpan<char> str, out T result) where T : struct, Enum
         {
-            if (int.TryParse(str, out int intVal))
+            if (str.TryParseUnderlyingValue<T>(out ulong numericValue))
             {
-                int idx = Array.IndexOf(Cache<T>.IntValues, intVal, 0);
+                int idx = Array.IndexOf(Cache<T>.NumericValues, numericValue, 0);
                 if (idx != -1)
                 {
                     result = Cache<T>.Values[idx];
@@ -164,12 +165,58 @@ namespace FerryKit.Core
             return false;
         }
 
+        [MethodImpl(Opt.Inline)]
+        private static bool TryParseUnderlyingValue<T>(this ReadOnlySpan<char> str, out ulong result) where T : struct, Enum
+        {
+            switch (Cache<T>.UnderlyingTypeCode)
+            {
+                case TypeCode.SByte:
+                    bool sbyteParsed = sbyte.TryParse(str, out sbyte sbyteValue);
+                    result = unchecked((byte)sbyteValue);
+                    return sbyteParsed;
+                case TypeCode.Byte:
+                    bool byteParsed = byte.TryParse(str, out byte byteValue);
+                    result = byteValue;
+                    return byteParsed;
+                case TypeCode.Int16:
+                    bool shortParsed = short.TryParse(str, out short shortValue);
+                    result = unchecked((ushort)shortValue);
+                    return shortParsed;
+                case TypeCode.UInt16:
+                    bool ushortParsed = ushort.TryParse(str, out ushort ushortValue);
+                    result = ushortValue;
+                    return ushortParsed;
+                case TypeCode.Int32:
+                    bool intParsed = int.TryParse(str, out int intValue);
+                    result = unchecked((uint)intValue);
+                    return intParsed;
+                case TypeCode.UInt32:
+                    bool uintParsed = uint.TryParse(str, out uint uintValue);
+                    result = uintValue;
+                    return uintParsed;
+                case TypeCode.Int64:
+                    bool longParsed = long.TryParse(str, out long longValue);
+                    result = unchecked((ulong)longValue);
+                    return longParsed;
+                case TypeCode.UInt64:
+                    return ulong.TryParse(str, out result);
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static NotSupportedException CreateUnsupportedEnumSizeException<T>(int size) where T : struct, Enum
+            => new($"Enum '{typeof(T)}' uses an unsupported storage size: {size} bytes.");
+
         private static class Cache<T> where T : struct, Enum
         {
             public static readonly T[] Values;
             public static readonly int Count;
             public static readonly string[] Names;
-            public static readonly int[] IntValues;
+            public static readonly ulong[] NumericValues;
+            public static readonly TypeCode UnderlyingTypeCode;
             public static readonly HashSet<T> ValueSet;
             public static readonly Dictionary<string, T> StringMap;
             public static readonly Dictionary<string, T> StringMapIgnoreCase;
@@ -179,7 +226,8 @@ namespace FerryKit.Core
                 Values = (T[])Enum.GetValues(typeof(T));
                 Count = Values.Length;
                 Names = Enum.GetNames(typeof(T));
-                IntValues = new int[Count];
+                NumericValues = new ulong[Count];
+                UnderlyingTypeCode = Type.GetTypeCode(Enum.GetUnderlyingType(typeof(T)));
                 ValueSet = new(Values);
                 StringMap = new(Count);
                 StringMapIgnoreCase = new(Count, StringComparer.OrdinalIgnoreCase);
@@ -187,7 +235,7 @@ namespace FerryKit.Core
                 {
                     var val = Values[i];
                     var name = Names[i];
-                    IntValues[i] = (int)(object)val; // Since this is the first parsing, it is okay if boxing occurs.
+                    NumericValues[i] = ToUInt64Bits(val);
                     StringMap.Add(name, val);
                     StringMapIgnoreCase.TryAdd(name, val); // ignore case allows duplicates (first value takes precedence)
                 }
