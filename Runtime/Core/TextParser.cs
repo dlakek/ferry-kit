@@ -420,23 +420,22 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var igc = policy.IgnoreCase;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
-            if (num == 1)
+            int idx = span.IndexOfUnquoted(sep, esc);
+            if (idx == -1)
                 return span.Parse<T>(igc);
 
             T ret = default;
             int start = 0;
-            while (start < len)
+            while (idx != -1)
             {
-                int idx = span.IndexOfUnquoted(sep, start, esc);
-                if (idx == -1)
-                {
-                    ret.AccumulateFlag(span[start..].Parse<T>(igc));
-                    break;
-                }
                 ret.AccumulateFlag(span[start..idx].Parse<T>(igc));
                 start = idx + 1;
+                if (start == len)
+                    return ret;
+
+                idx = span.IndexOfUnquoted(sep, start, esc);
             }
+            ret.AccumulateFlag(span[start..].Parse<T>(igc));
             return ret;
         }
 
@@ -452,24 +451,27 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var igc = policy.IgnoreCase;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
-            if (num == 1)
+            int idx = span.IndexOfUnquoted(sep, esc);
+            if (idx == -1)
                 return span.TryParse(out result, igc);
 
             int start = 0;
-            while (start < len)
+            while (idx != -1)
             {
-                int idx = span.IndexOfUnquoted(sep, start, esc);
-                var sub = idx == -1 ? span[start..] : span[start..idx];
-                if (!sub.TryParse(out T parsed, igc))
+                if (!span[start..idx].TryParse(out T parsed, igc))
                     return false;
 
                 result.AccumulateFlag(parsed);
-                if (idx == -1)
-                    break;
-
                 start = idx + 1;
+                if (start == len)
+                    return true;
+
+                idx = span.IndexOfUnquoted(sep, start, esc);
             }
+            if (!span[start..].TryParse(out T last, igc))
+                return false;
+
+            result.AccumulateFlag(last);
             return true;
         }
 
@@ -482,7 +484,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.ArrSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new T[num];
             int arrIdx = 0;
             int start = 0;
@@ -512,7 +514,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.ArrSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new T[num];
             int arrIdx = 0;
             int start = 0;
@@ -544,7 +546,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.ArrSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new List<T>(num);
             int start = 0;
             while (start < len)
@@ -573,7 +575,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.ArrSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new List<T>(num);
             int start = 0;
             while (start < len)
@@ -602,7 +604,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.SetSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new HashSet<T>(num);
             int start = 0;
             while (start < len)
@@ -632,7 +634,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.SetSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new HashSet<T>(num);
             int start = 0;
             while (start < len)
@@ -663,7 +665,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.DictSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new Dictionary<K, V>(num);
             int start = 0;
             while (start < len)
@@ -692,7 +694,7 @@ namespace FerryKit.Core
             var esc = policy.EscapeMode;
             var sep = policy.DictSep;
             int len = span.Length;
-            int num = span.CountByUnquotedSep(sep, esc);
+            int num = span.CountElementsByUnquotedSep(sep, esc);
             var ret = new Dictionary<K, V>(num);
             int start = 0;
             while (start < len)
@@ -755,14 +757,16 @@ namespace FerryKit.Core
         }
 
         [MethodImpl(Opt.Inline)]
-        private static int CountByUnquotedSep(this ReadOnlySpan<char> span, char sep, QuoteEscapeMode esc)
+        private static int CountElementsByUnquotedSep(this ReadOnlySpan<char> span, char sep, QuoteEscapeMode esc)
         {
             int count = 1;
             int idx = 0;
             while ((idx = span.IndexOfUnquoted(sep, idx, esc)) != -1)
             {
+                if (++idx == span.Length)
+                    break;
+
                 ++count;
-                ++idx;
             }
             return count;
         }
