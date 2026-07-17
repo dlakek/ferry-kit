@@ -1,4 +1,6 @@
 using FerryKit.Core;
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -11,16 +13,15 @@ namespace FerryKit
     /// </summary>
     public abstract class SingletonBase<T> : MonoBehaviour where T : SingletonBase<T>
     {
-        protected static T _instance;
-        protected static bool _isQuitting;
+        private static T _instance;
+        private static bool _isQuitting;
 
-        [MethodImpl(Opt.Inline)]
-        protected static T GetInstance() => _instance is null // null check with is pattern to avoid Unity's overload call (performance optimization)
-            ? _instance = FindAnyObjectByType<T>(FindObjectsInactive.Include)
-            : _instance;
+        protected virtual void OnAwake() { }
+        protected virtual void OnBeforeDestroy() { }
 
         private void Awake()
         {
+            SingletonResetRegistry.Register<T>();
             if (_instance != null && _instance != this)
             {
                 Destroy(gameObject);
@@ -46,8 +47,37 @@ namespace FerryKit
             _isQuitting = true;
         }
 
-        protected virtual void OnAwake() { }
-        protected virtual void OnBeforeDestroy() { }
+        internal static void ResetStatics()
+        {
+            _instance = null;
+            _isQuitting = false;
+        }
+
+        [MethodImpl(Opt.Inline)]
+        private protected static T GetInstance() => _instance is null // null check with is pattern to avoid Unity's overload call (performance optimization)
+            ? _instance = FindAnyObjectByType<T>(FindObjectsInactive.Include)
+            : _instance;
+
+        /// <summary>
+        /// To enable instance getter inlining optimization, the cold path logic is separated into a separate function.
+        /// </summary>
+        private protected static T FallbackToCreateInstance()
+        {
+            if (!_isQuitting)
+            {
+                new GameObject(typeof(T).Name).AddComponent<T>(); // Awake is called within AddComponent and _instance is set.
+            }
+            return _instance;
+        }
+
+        private protected static T FallbackToLogging()
+        {
+            if (!_isQuitting)
+            {
+                DevLog.LogError($"'{typeof(T)}' is missing in the scene! this singleton does not auto-create.");
+            }
+            return _instance;
+        }
     }
 
     /// <summary>
@@ -60,20 +90,7 @@ namespace FerryKit
         public static T Instance
         {
             [MethodImpl(Opt.Inline)]
-            get => GetInstance() ?? CreateInstance();
-        }
-
-        /// <summary>
-        /// To enable instance getter inlining optimization,
-        /// the cold path logic is separated into a separate function.
-        /// </summary>
-        private static T CreateInstance()
-        {
-            if (!_isQuitting)
-            {
-                new GameObject(typeof(T).Name).AddComponent<T>(); // Awake is called within AddComponent and _instance is set.
-            }
-            return _instance;
+            get => GetInstance() ?? FallbackToCreateInstance();
         }
     }
 
@@ -87,20 +104,38 @@ namespace FerryKit
         public static T Instance
         {
             [MethodImpl(Opt.Inline)]
-            get => GetInstance() ?? Logging();
+            get => GetInstance() ?? FallbackToLogging();
+        }
+    }
+
+    /// <summary>
+    /// A registry that tracks all singleton types and resets their static fields when the application is reloaded.
+    /// </summary>
+    internal static class SingletonResetRegistry
+    {
+        private static readonly List<Action> _resetters = new();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegisteredSingletons()
+        {
+            foreach (var resetter in _resetters)
+            {
+                resetter();
+            }
         }
 
-        /// <summary>
-        /// To enable instance getter inlining optimization,
-        /// the cold path logic is separated into a separate function.
-        /// </summary>
-        private static T Logging()
+        internal static void Register<T>() where T : SingletonBase<T>
         {
-            if (!_isQuitting)
-            {
-                DevLog.LogError($"'{typeof(T)}' is missing in the scene! this singleton does not auto-create.");
-            }
-            return _instance;
+            if (Registration<T>.IsRegistered)
+                return;
+
+            Registration<T>.IsRegistered = true;
+            _resetters.Add(SingletonBase<T>.ResetStatics);
+        }
+
+        private static class Registration<T>
+        {
+            internal static bool IsRegistered { get; set; }
         }
     }
 }
