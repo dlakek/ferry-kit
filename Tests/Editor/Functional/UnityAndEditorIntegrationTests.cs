@@ -102,7 +102,7 @@ namespace FerryKit.Core.Tests.Functional
     {
         public int Id;
         public string Name;
-        public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+        public bool TryParse(ref LineReader reader)
             => reader.TryRead(out Id) && reader.TryRead(out Name);
     }
 }

@@ -26,6 +26,14 @@ namespace FerryKit.Core
     /// </summary>
     public interface IParsable
     {
+        void Parse(ref LineReader reader);
+    }
+
+    /// <summary>
+    /// An object interface that can be parsed with an explicitly supplied policy.
+    /// </summary>
+    public interface IParsableWithPolicy
+    {
         void Parse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy;
     }
 
@@ -33,6 +41,14 @@ namespace FerryKit.Core
     /// An object interface that can be parsed through TextParser(how to handle failures during the parsing process by returning false)
     /// </summary>
     public interface ITryParsable
+    {
+        bool TryParse(ref LineReader reader);
+    }
+
+    /// <summary>
+    /// An object interface that can be parsed with an explicitly supplied policy without throwing on format failure.
+    /// </summary>
+    public interface ITryParsableWithPolicy
     {
         bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy;
     }
@@ -44,49 +60,61 @@ namespace FerryKit.Core
     {
         private const int _estimateLengthPerLine = 50;
 
-        public static List<T> Parse<T>(string text, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static List<T> Parse<T>(this string text, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : IParsable, new()
-            => Parse<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
-
-        public static bool TryParse<T>(string text, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
-            where T : ITryParsable, new()
-            => TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine, isRevertWhenFail);
-
-        public static bool TryParse<T>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
-            where T : ITryParsable, new()
         {
-            result = new();
-            return TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine);
+            if (string.IsNullOrWhiteSpace(text))
+                return new();
+
+            var splitter = new LineSplitter<ParseHelper.Default>(text, default);
+            var reader = new LineReader(default);
+            var result = new List<T>(text.GetReserveSize(reserveLine));
+            if (isSkipFirstLine)
+            {
+                splitter.MoveNext();
+            }
+            var line = splitter.Current;
+            try
+            {
+                while (splitter.MoveNext())
+                {
+                    line = splitter.Current;
+                    if (line.IsWhiteSpace())
+                        continue;
+
+                    reader = new(line);
+                    var data = new T();
+                    data.Parse(ref reader);
+                    result.Add(data);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw CreateFormatException(line, reader.Current, ex);
+            }
+            return result;
         }
 
-        public static bool TryParse<T, P>(string text, P policy, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
-            where T : ITryParsable, new()
-            where P : struct, IParsePolicy
-        {
-            result = new();
-            return TryParse(text, policy, result, out reason, reserveLine, isSkipFirstLine);
-        }
-
-        public static List<T> Parse<T, P>(string text, P policy, int reserveLine = 0, bool isSkipFirstLine = false)
-            where T : IParsable, new()
+        public static List<T> Parse<T, P>(this string text, P policy, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : IParsableWithPolicy, new()
             where P : struct, IParsePolicy
         {
             if (string.IsNullOrWhiteSpace(text))
                 return new();
 
-            var lineSplitter = new LineSplitter<P>(text, policy);
+            var splitter = new LineSplitter<P>(text, policy);
+            var reader = new LineReader<P>(default, policy);
+            var result = new List<T>(text.GetReserveSize(reserveLine));
             if (isSkipFirstLine)
             {
-                lineSplitter.MoveNext();
+                splitter.MoveNext();
             }
-            var result = new List<T>(reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine);
-            var reader = new LineReader<P>(default, policy);
-            var line = lineSplitter.Current;
+            var line = splitter.Current;
             try
             {
-                while (lineSplitter.MoveNext())
+                while (splitter.MoveNext())
                 {
-                    line = lineSplitter.Current;
+                    line = splitter.Current;
                     if (line.IsWhiteSpace())
                         continue;
 
@@ -98,72 +126,106 @@ namespace FerryKit.Core
             }
             catch (Exception ex)
             {
-                throw new FormatException($"parse failed. line: {line.ToString()}, cell: {reader.Current.ToString()}, reason: {ex.Message}", ex);
+                throw CreateFormatException(line, reader.Current, ex);
             }
             return result;
         }
 
-        public static bool TryParse<T, P>(string text, P policy, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
+        public static bool TryParse<T>(this string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : ITryParsable, new()
-            where P : struct, IParsePolicy
         {
-            if (result == null)
-                throw new ArgumentNullException(nameof(result));
-
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                reason = "input text is null or empty";
-                return false;
-            }
-            var lineSplitter = new LineSplitter<P>(text, policy);
-            if (isSkipFirstLine)
-            {
-                lineSplitter.MoveNext();
-            }
-            int reserveSize = reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine;
-            if (!isRevertWhenFail)
-            {
-                result.Clear();
-                if (result.Capacity < reserveSize)
-                {
-                    result.Capacity = reserveSize;
-                }
-                return TryParseLines(ref lineSplitter, policy, result, out reason);
-            }
-            int originalCount = result.Count;
-            int requiredCapacity = checked(originalCount + reserveSize);
-            if (result.Capacity < requiredCapacity)
-            {
-                result.Capacity = requiredCapacity;
-            }
-            bool parsedSuccessfully = false;
-            try
-            {
-                parsedSuccessfully = TryParseLines(ref lineSplitter, policy, result, out reason);
-                return parsedSuccessfully;
-            }
-            finally
-            {
-                if (parsedSuccessfully)
-                {
-                    if (originalCount > 0)
-                    {
-                        result.RemoveRange(0, originalCount);
-                    }
-                }
-                else
-                {
-                    int appendedCount = result.Count - originalCount;
-                    if (appendedCount > 0)
-                    {
-                        result.RemoveRange(originalCount, appendedCount);
-                    }
-                }
-            }
+            result = new();
+            return text.TryParse(result, out reason, reserveLine, isSkipFirstLine);
         }
 
-        private static bool TryParseLines<T, P>(ref LineSplitter<P> lineSplitter, P policy, List<T> result, out string reason)
+        public static bool TryParse<T>(this string text, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
             where T : ITryParsable, new()
+        {
+            if (!text.TryPrepare(result, reserveLine, isRevertWhenFail, out int originalCount, out reason))
+                return false;
+
+            var splitter = new LineSplitter<ParseHelper.Default>(text, default);
+            if (isSkipFirstLine)
+            {
+                splitter.MoveNext();
+            }
+            if (isRevertWhenFail)
+            {
+                bool isSuccess = false;
+                try
+                {
+                    isSuccess = splitter.TryParseLines(result, out reason);
+                }
+                finally
+                {
+                    result.CompleteTryParse(originalCount, isSuccess);
+                }
+                return isSuccess;
+            }
+            return splitter.TryParseLines(result, out reason);
+        }
+
+        public static bool TryParse<T, P>(this string text, P policy, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+            where T : ITryParsableWithPolicy, new()
+            where P : struct, IParsePolicy
+        {
+            result = new();
+            return text.TryParse(policy, result, out reason, reserveLine, isSkipFirstLine);
+        }
+
+        public static bool TryParse<T, P>(this string text, P policy, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
+            where T : ITryParsableWithPolicy, new()
+            where P : struct, IParsePolicy
+        {
+            if (!text.TryPrepare(result, reserveLine, isRevertWhenFail, out int originalCount, out reason))
+                return false;
+
+            var splitter = new LineSplitter<P>(text, policy);
+            if (isSkipFirstLine)
+            {
+                splitter.MoveNext();
+            }
+            if (isRevertWhenFail)
+            {
+                bool isSuccess = false;
+                try
+                {
+                    isSuccess = splitter.TryParseLines(policy, result, out reason);
+                }
+                finally
+                {
+                    result.CompleteTryParse(originalCount, isSuccess);
+                }
+                return isSuccess;
+            }
+            return splitter.TryParseLines(policy, result, out reason);
+        }
+
+        private static bool TryParseLines<T>(this ref LineSplitter<ParseHelper.Default> lineSplitter, List<T> result, out string reason)
+            where T : ITryParsable, new()
+        {
+            var reader = new LineReader(default);
+            foreach (var line in lineSplitter)
+            {
+                if (line.IsWhiteSpace())
+                    continue;
+
+                reader = new(line);
+                var data = new T();
+                if (data.TryParse(ref reader))
+                {
+                    result.Add(data);
+                    continue;
+                }
+                reason = CreateFailureReason(line, reader.Current);
+                return false;
+            }
+            reason = null;
+            return true;
+        }
+
+        private static bool TryParseLines<T, P>(this ref LineSplitter<P> lineSplitter, P policy, List<T> result, out string reason)
+            where T : ITryParsableWithPolicy, new()
             where P : struct, IParsePolicy
         {
             var reader = new LineReader<P>(default, policy);
@@ -179,12 +241,70 @@ namespace FerryKit.Core
                     result.Add(data);
                     continue;
                 }
-                reason = $"parse failed. line: {line.ToString()}, cell: {reader.Current.ToString()}";
+                reason = CreateFailureReason(line, reader.Current);
                 return false;
             }
             reason = null;
             return true;
         }
+
+        private static bool TryPrepare<T>(this string text, List<T> result, int reserveLine, bool isRevertWhenFail, out int originalCount, out string reason)
+        {
+            if (result == null)
+                throw new ArgumentNullException(nameof(result));
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                originalCount = 0;
+                reason = "input text is null or empty";
+                return false;
+            }
+            if (isRevertWhenFail)
+            {
+                originalCount = result.Count;
+            }
+            else
+            {
+                originalCount = 0;
+                result.Clear();
+            }
+            int requiredCapacity = checked(originalCount + text.GetReserveSize(reserveLine));
+            if (result.Capacity < requiredCapacity)
+            {
+                result.Capacity = requiredCapacity;
+            }
+            reason = null;
+            return true;
+        }
+
+        private static void CompleteTryParse<T>(this List<T> result, int originalCount, bool isSuccess)
+        {
+            if (isSuccess)
+            {
+                if (originalCount > 0)
+                {
+                    result.RemoveRange(0, originalCount);
+                }
+            }
+            else
+            {
+                int appendedCount = result.Count - originalCount;
+                if (appendedCount > 0)
+                {
+                    result.RemoveRange(originalCount, appendedCount);
+                }
+            }
+        }
+
+        [MethodImpl(Opt.Inline)]
+        private static int GetReserveSize(this string text, int reserveLine)
+            => reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine;
+
+        private static string CreateFailureReason(ReadOnlySpan<char> line, ReadOnlySpan<char> cell)
+            => $"parse failed. line: {line.ToString()}, cell: {cell.ToString()}";
+
+        private static FormatException CreateFormatException(ReadOnlySpan<char> line, ReadOnlySpan<char> cell, Exception exception)
+            => new($"{CreateFailureReason(line, cell)}, reason: {exception.Message}", exception);
     }
 
     /// <summary>
@@ -282,6 +402,22 @@ namespace FerryKit.Core
             }
             return _curRead;
         }
+    }
+
+    /// <summary>
+    /// A line reader that uses <see cref="ParseHelper.Default"/>.
+    /// </summary>
+    public ref struct LineReader
+    {
+        private LineReader<ParseHelper.Default> _reader;
+
+        public readonly ReadOnlySpan<char> Line => _reader.Line;
+        public readonly ReadOnlySpan<char> Current => _reader.Current;
+
+        [MethodImpl(Opt.Inline)] public T Read<T>() => _reader.Read<T>();
+        [MethodImpl(Opt.Inline)] public bool TryRead<T>(out T result) => _reader.TryRead(out result);
+        [MethodImpl(Opt.Inline)] public ReadOnlySpan<char> ReadNext() => _reader.ReadNext();
+        [MethodImpl(Opt.Inline)] public LineReader(ReadOnlySpan<char> line) => _reader = new(line, default);
     }
 
     /// <summary>
@@ -750,8 +886,16 @@ namespace FerryKit.Core
         {
             if (span.Length == 1)
             {
-                if (span[0] == '1') { result = true; return true; }
-                if (span[0] == '0') { result = false; return true; }
+                if (span[0] == '1')
+                {
+                    result = true;
+                    return true;
+                }
+                if (span[0] == '0')
+                {
+                    result = false;
+                    return true;
+                }
             }
             result = false;
             return false;

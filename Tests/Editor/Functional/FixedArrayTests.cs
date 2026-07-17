@@ -87,7 +87,7 @@ namespace FerryKit.Tests.Functional
             public FixedArray4<int> Values;
             public float Ratio;
 
-            public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+            public bool TryParse(ref LineReader reader)
                 => reader.TryRead(out Id)
                 && Values.TryParse(ref reader)
                 && reader.TryRead(out Ratio);

@@ -8,7 +8,7 @@ namespace FerryKit
 {
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct FixedArray2<T> : ITryParsable where T : unmanaged
+    public struct FixedArray2<T> : ITryParsable, ITryParsableWithPolicy where T : unmanaged
     {
         public const int Capacity = 2;
 
@@ -20,8 +20,16 @@ namespace FerryKit
         public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
 
         [MethodImpl(Opt.Inline)]
+        public bool TryParse(ReadOnlySpan<char> value)
+            => FixedArrayHelper.TryParse(value, default(ParseHelper.Default), Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy
             => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
+        public bool TryParse(ref LineReader reader)
+            => TryParse(reader.ReadNext(), default(ParseHelper.Default));
 
         [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
@@ -30,7 +38,7 @@ namespace FerryKit
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct FixedArray3<T> : ITryParsable where T : unmanaged
+    public struct FixedArray3<T> : ITryParsable, ITryParsableWithPolicy where T : unmanaged
     {
         public const int Capacity = 3;
 
@@ -43,8 +51,16 @@ namespace FerryKit
         public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
 
         [MethodImpl(Opt.Inline)]
+        public bool TryParse(ReadOnlySpan<char> value)
+            => FixedArrayHelper.TryParse(value, default(ParseHelper.Default), Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy
             => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
+        public bool TryParse(ref LineReader reader)
+            => TryParse(reader.ReadNext(), default(ParseHelper.Default));
 
         [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
@@ -53,7 +69,7 @@ namespace FerryKit
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct FixedArray4<T> : ITryParsable where T : unmanaged
+    public struct FixedArray4<T> : ITryParsable, ITryParsableWithPolicy where T : unmanaged
     {
         public const int Capacity = 4;
 
@@ -67,8 +83,16 @@ namespace FerryKit
         public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
 
         [MethodImpl(Opt.Inline)]
+        public bool TryParse(ReadOnlySpan<char> value)
+            => FixedArrayHelper.TryParse(value, default(ParseHelper.Default), Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy
             => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
+        public bool TryParse(ref LineReader reader)
+            => TryParse(reader.ReadNext(), default(ParseHelper.Default));
 
         [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
@@ -77,7 +101,7 @@ namespace FerryKit
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct FixedArray5<T> : ITryParsable where T : unmanaged
+    public struct FixedArray5<T> : ITryParsable, ITryParsableWithPolicy where T : unmanaged
     {
         public const int Capacity = 5;
 
@@ -92,8 +116,16 @@ namespace FerryKit
         public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
 
         [MethodImpl(Opt.Inline)]
+        public bool TryParse(ReadOnlySpan<char> value)
+            => FixedArrayHelper.TryParse(value, default(ParseHelper.Default), Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy
             => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
+
+        [MethodImpl(Opt.Inline)]
+        public bool TryParse(ref LineReader reader)
+            => TryParse(reader.ReadNext(), default(ParseHelper.Default));
 
         [MethodImpl(Opt.Inline)]
         public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy

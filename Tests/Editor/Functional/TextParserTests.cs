@@ -95,11 +95,36 @@ namespace FerryKit.Core.Tests.Functional
             Assert.Throws<ArgumentNullException>(() => TextParser.TryParse<TryRow>("1,ok", null, out _));
         }
 
+        [Test]
+        public void TryParse_SupportsNestedTryParsableWithDefaultReader()
+        {
+            Assert.That(TextParser.TryParse<NestedTryRow>("7,0.25,alpha", out var rows, out string reason), Is.True, reason);
+            Assert.That(rows[0].Data.Id, Is.EqualTo(7));
+            Assert.That(rows[0].Data.Ratio, Is.EqualTo(0.25f));
+            Assert.That(rows[0].Name, Is.EqualTo("alpha"));
+        }
+
+        [Test]
+        public void ParseAndTryParse_SupportExplicitPolicyInterfaces()
+        {
+            var policy = new ParseHelper.Custom(colSep: '\t');
+
+            List<PolicyRow> parsed = TextParser.Parse<PolicyRow, ParseHelper.Custom>("7\t0.25\talpha", policy);
+            Assert.That(parsed[0].Data.Id, Is.EqualTo(7));
+            Assert.That(parsed[0].Data.Ratio, Is.EqualTo(0.25f));
+            Assert.That(parsed[0].Name, Is.EqualTo("alpha"));
+
+            Assert.That(TextParser.TryParse<PolicyTryRow, ParseHelper.Custom>("8\t0.5\tbeta", policy, out var tried, out string reason), Is.True, reason);
+            Assert.That(tried[0].Data.Id, Is.EqualTo(8));
+            Assert.That(tried[0].Data.Ratio, Is.EqualTo(0.5f));
+            Assert.That(tried[0].Name, Is.EqualTo("beta"));
+        }
+
         public sealed class Row : IParsable
         {
             public int Id;
             public string Name;
-            public void Parse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+            public void Parse(ref LineReader reader)
             {
                 Id = reader.Read<int>();
                 Name = reader.Read<string>();
@@ -110,8 +135,62 @@ namespace FerryKit.Core.Tests.Functional
         {
             public int Id;
             public string Name;
-            public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+            public bool TryParse(ref LineReader reader)
                 => reader.TryRead(out Id) && reader.TryRead(out Name);
+        }
+
+        public struct NestedData : ITryParsable
+        {
+            public int Id;
+            public float Ratio;
+
+            public bool TryParse(ref LineReader reader)
+                => reader.TryRead(out Id) && reader.TryRead(out Ratio);
+        }
+
+        public sealed class NestedTryRow : ITryParsable
+        {
+            public NestedData Data;
+            public string Name;
+
+            public bool TryParse(ref LineReader reader)
+                => Data.TryParse(ref reader) && reader.TryRead(out Name);
+        }
+
+        public struct PolicyData
+        {
+            public int Id;
+            public float Ratio;
+
+            public void Parse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+            {
+                Id = reader.Read<int>();
+                Ratio = reader.Read<float>();
+            }
+
+            public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+                => reader.TryRead(out Id) && reader.TryRead(out Ratio);
+        }
+
+        public sealed class PolicyRow : IParsableWithPolicy
+        {
+            public PolicyData Data;
+            public string Name;
+
+            public void Parse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+            {
+                Data.Parse(ref reader);
+                Name = reader.Read<string>();
+            }
+        }
+
+        public sealed class PolicyTryRow : ITryParsableWithPolicy
+        {
+            public PolicyData Data;
+            public string Name;
+
+            public bool TryParse<P>(ref LineReader<P> reader) where P : struct, IParsePolicy
+                => Data.TryParse(ref reader) && reader.TryRead(out Name);
         }
     }
 }
