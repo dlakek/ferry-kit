@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using static FerryKit.Core.StringHelper;
@@ -91,7 +90,7 @@ namespace FerryKit.Core
                         continue;
 
                     reader = new(line, policy);
-                    var data = ExpressionCache<T>.New();
+                    var data = new T();
                     data.Parse(ref reader);
                     result.Add(data);
                 }
@@ -173,7 +172,7 @@ namespace FerryKit.Core
                     continue;
 
                 reader = new(line, policy);
-                var data = ExpressionCache<T>.New();
+                var data = new T();
                 if (data.TryParse(ref reader))
                 {
                     result.Add(data);
@@ -388,12 +387,12 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] private static DateTime ToDateTime<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToDateTime();
         [MethodImpl(Opt.Inline)] private static string ToStr<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToStr();
         [MethodImpl(Opt.Inline)] private static bool ToBool<P>(this ReadOnlySpan<char> s, P _) where P : struct, IParsePolicy => s.ToBool();
-        [MethodImpl(Opt.Inline)] private static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.ToEnumImpl<T, P>(p);
-        [MethodImpl(Opt.Inline)] private static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] private static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] private static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] private static Dictionary<K, V> ToDictionary<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToDictionaryImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
-        [MethodImpl(Opt.Inline)] private static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static T ToEnum<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy where T : struct, Enum => s.ToEnumImpl<T, P>(p);
+        [Preserve, MethodImpl(Opt.Inline)] private static T[] ToArray<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToArrayImpl(Cache<T, P>.Parse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static List<T> ToList<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToListImpl(Cache<T, P>.Parse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static HashSet<T> ToHashSet<T, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToHashSetImpl(Cache<T, P>.Parse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static Dictionary<K, V> ToDictionary<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToDictionaryImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static (K, V) ToPair<K, V, P>(this ReadOnlySpan<char> s, P p) where P : struct, IParsePolicy => s.ToPairImpl(Cache<K, P>.Parse, Cache<V, P>.Parse, p);
 
         [MethodImpl(Opt.Inline)] private static bool TryToInt<P>(this ReadOnlySpan<char> s, out int r, P _) where P : struct, IParsePolicy => s.TryToInt(out r);
         [MethodImpl(Opt.Inline)] private static bool TryToLong<P>(this ReadOnlySpan<char> s, out long r, P _) where P : struct, IParsePolicy => s.TryToLong(out r);
@@ -402,12 +401,12 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] private static bool TryToDateTime<P>(this ReadOnlySpan<char> s, out DateTime r, P _) where P : struct, IParsePolicy => s.TryToDateTime(out r);
         [MethodImpl(Opt.Inline)] private static bool TryToStr<P>(this ReadOnlySpan<char> s, out string r, P _) where P : struct, IParsePolicy => s.TryToStr(out r);
         [MethodImpl(Opt.Inline)] private static bool TryToBool<P>(this ReadOnlySpan<char> s, out bool r, P _) where P : struct, IParsePolicy => s.TryToBool(out r);
-        [MethodImpl(Opt.Inline)] private static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryToEnumImpl(out r, p);
-        [MethodImpl(Opt.Inline)] private static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] private static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] private static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] private static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
-        [MethodImpl(Opt.Inline)] private static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToEnum<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy where T : struct, Enum => s.TryToEnumImpl(out r, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToArray<T, P>(this ReadOnlySpan<char> s, out T[] r, P p) where P : struct, IParsePolicy => s.TryToArrayImpl(out r, Cache<T, P>.TryParse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToList<T, P>(this ReadOnlySpan<char> s, out List<T> r, P p) where P : struct, IParsePolicy => s.TryToListImpl(out r, Cache<T, P>.TryParse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToHashSet<T, P>(this ReadOnlySpan<char> s, out HashSet<T> r, P p) where P : struct, IParsePolicy => s.TryToHashSetImpl(out r, Cache<T, P>.TryParse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToDictionary<K, V, P>(this ReadOnlySpan<char> s, out Dictionary<K, V> r, P p) where P : struct, IParsePolicy => s.TryToDictionaryImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
+        [Preserve, MethodImpl(Opt.Inline)] private static bool TryToPair<K, V, P>(this ReadOnlySpan<char> s, out (K, V) r, P p) where P : struct, IParsePolicy => s.TryToPairImpl(out r, Cache<K, P>.TryParse, Cache<V, P>.TryParse, p);
 
         private static T ToEnumImpl<T, P>(this ReadOnlySpan<char> span, P policy = default)
             where T : struct, Enum
@@ -768,7 +767,8 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// Caching via reflection only once for each specialized type
+        /// Caches the parser delegate once for each specialized type.
+        /// Reflection is only used to close generic collection and enum wrappers.
         /// </summary>
         private static class Cache<T, P> where P : struct, IParsePolicy
         {
@@ -808,89 +808,24 @@ namespace FerryKit.Core
                 _ => throw new ArgumentException($"no parser for TryParse<{typeof(T).Name}, {typeof(P).Name}>")
             };
 
-            static Cache()
-            {
-                // prevent code stripping
-                var tmpP = default(P);
-                var tmpS = "".AsSpan();
-                try
-                {
-                    tmpS.ToInt(tmpP);
-                    tmpS.ToLong(tmpP);
-                    tmpS.ToFloat(tmpP);
-                    tmpS.ToDouble(tmpP);
-                    tmpS.ToDateTime(tmpP);
-                    tmpS.ToStr(tmpP);
-                    tmpS.ToBool(tmpP);
-                    tmpS.ToEnum<QuoteEscapeMode, P>(tmpP);
-                    tmpS.ToArray<int, P>(tmpP);
-                    tmpS.ToList<int, P>(tmpP);
-                    tmpS.ToHashSet<int, P>(tmpP);
-                    tmpS.ToDictionary<int, int, P>(tmpP);
-                    tmpS.ToPair<int, int, P>(tmpP);
-                    tmpS.TryToInt(out var _, tmpP);
-                    tmpS.TryToLong(out var _, tmpP);
-                    tmpS.TryToFloat(out var _, tmpP);
-                    tmpS.TryToDouble(out var _, tmpP);
-                    tmpS.TryToDateTime(out var _, tmpP);
-                    tmpS.TryToStr(out var _, tmpP);
-                    tmpS.TryToBool(out var _, tmpP);
-                    tmpS.TryToEnum<QuoteEscapeMode, P>(out var _, tmpP);
-                    tmpS.TryToArray<int, P>(out var _, tmpP);
-                    tmpS.TryToList<int, P>(out var _, tmpP);
-                    tmpS.TryToHashSet<int, P>(out var _, tmpP);
-                    tmpS.TryToDictionary<int, int, P>(out var _, tmpP);
-                    tmpS.TryToPair<int, int, P>(out var _, tmpP);
-                }
-                catch
-                {
-                }
-            }
-
             private static Parser<T, P> CreateParser(string methodName, params Type[] typeArgs)
             {
-                var method = FindParserMethod(methodName, 2, false);
+                var method = FindParser(methodName);
                 return method == null
-                    ? throw new InvalidOperationException($"failed to bind wrapper method: {methodName}<{string.Join(", ", typeArgs.Select(t => t.Name))}>")
+                    ? throw new InvalidOperationException($"failed to bind parser wrapper '{methodName}' for '{typeof(T)}'.")
                     : (Parser<T, P>)Delegate.CreateDelegate(typeof(Parser<T, P>), method.MakeGenericMethod(typeArgs));
             }
 
             private static TryParser<T, P> CreateTryParser(string methodName, params Type[] typeArgs)
             {
-                var method = FindParserMethod(methodName, 3, true);
+                var method = FindParser(methodName);
                 return method == null
-                    ? throw new InvalidOperationException($"failed to bind wrapper method: {methodName}<{string.Join(", ", typeArgs.Select(t => t.Name))}>")
+                    ? throw new InvalidOperationException($"failed to bind try-parser wrapper '{methodName}' for '{typeof(T)}'.")
                     : (TryParser<T, P>)Delegate.CreateDelegate(typeof(TryParser<T, P>), method.MakeGenericMethod(typeArgs));
             }
 
-            private static MethodInfo FindParserMethod(string methodName, int paramCount, bool hasOutParam)
-            {
-                foreach (var m in Methods)
-                {
-                    if (m.Name != methodName)
-                        continue;
-
-                    if (!m.IsGenericMethodDefinition)
-                        continue;
-
-                    var ps = m.GetParameters();
-                    if (ps.Length != paramCount)
-                        continue;
-
-                    if (ps[0].ParameterType != typeof(ReadOnlySpan<char>))
-                        continue;
-
-                    if (hasOutParam && !ps[1].IsOut)
-                        continue;
-
-                    return m;
-                }
-                return null;
-            }
-
+            private static MethodInfo FindParser(string methodName) => typeof(ParseHelper).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
             private static bool IsGeneric(Type type, Type genericDef) => type.IsGenericType && type.GetGenericTypeDefinition() == genericDef;
         }
-
-        private static readonly MethodInfo[] Methods = typeof(ParseHelper).GetMethods(BindingFlags.NonPublic | BindingFlags.Static);
     }
 }

@@ -47,7 +47,7 @@ namespace FerryKit.Core
         {
             if (!collection.TryGetValue(key, out var value))
             {
-                value = ExpressionCache<TValue>.New();
+                value = new TValue();
                 collection.Add(key, value);
             }
             return value;
