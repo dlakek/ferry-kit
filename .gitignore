@@ -99,4 +99,6 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 # Local Unity host project for developing and testing this UPM package.
-/LocalTestProject/
+# This includes Unity-generated .meta files.
+/FerryKitTest/
+/FerryKitTest.meta
