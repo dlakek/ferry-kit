@@ -48,9 +48,9 @@ namespace FerryKit.Core
             where T : IParsable, new()
             => Parse<T, ParseHelper.Default>(text, default, reserveLine, isSkipFirstLine);
 
-        public static bool TryParse<T>(string text, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static bool TryParse<T>(string text, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
             where T : ITryParsable, new()
-            => TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine);
+            => TryParse(text, default(ParseHelper.Default), result, out reason, reserveLine, isSkipFirstLine, isRevertWhenFail);
 
         public static bool TryParse<T>(string text, out List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
             where T : ITryParsable, new()
@@ -103,10 +103,13 @@ namespace FerryKit.Core
             return result;
         }
 
-        public static bool TryParse<T, P>(string text, P policy, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false)
+        public static bool TryParse<T, P>(string text, P policy, List<T> result, out string reason, int reserveLine = 0, bool isSkipFirstLine = false, bool isRevertWhenFail = false)
             where T : ITryParsable, new()
             where P : struct, IParsePolicy
         {
+            if (result == null)
+                throw new ArgumentNullException(nameof(result));
+
             if (string.IsNullOrWhiteSpace(text))
             {
                 reason = "input text is null or empty";
@@ -117,12 +120,52 @@ namespace FerryKit.Core
             {
                 lineSplitter.MoveNext();
             }
-            result.Clear();
             int reserveSize = reserveLine > 0 ? reserveLine : text.Length / _estimateLengthPerLine;
-            if (result.Capacity < reserveSize)
+            if (!isRevertWhenFail)
             {
-                result.Capacity = reserveSize;
+                result.Clear();
+                if (result.Capacity < reserveSize)
+                {
+                    result.Capacity = reserveSize;
+                }
+                return TryParseLines(ref lineSplitter, policy, result, out reason);
             }
+            int originalCount = result.Count;
+            int requiredCapacity = checked(originalCount + reserveSize);
+            if (result.Capacity < requiredCapacity)
+            {
+                result.Capacity = requiredCapacity;
+            }
+            bool parsedSuccessfully = false;
+            try
+            {
+                parsedSuccessfully = TryParseLines(ref lineSplitter, policy, result, out reason);
+                return parsedSuccessfully;
+            }
+            finally
+            {
+                if (parsedSuccessfully)
+                {
+                    if (originalCount > 0)
+                    {
+                        result.RemoveRange(0, originalCount);
+                    }
+                }
+                else
+                {
+                    int appendedCount = result.Count - originalCount;
+                    if (appendedCount > 0)
+                    {
+                        result.RemoveRange(originalCount, appendedCount);
+                    }
+                }
+            }
+        }
+
+        private static bool TryParseLines<T, P>(ref LineSplitter<P> lineSplitter, P policy, List<T> result, out string reason)
+            where T : ITryParsable, new()
+            where P : struct, IParsePolicy
+        {
             var reader = new LineReader<P>(default, policy);
             foreach (var line in lineSplitter)
             {
