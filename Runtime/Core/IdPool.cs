@@ -130,6 +130,9 @@ namespace FerryKit.Core
             if (capacity <= 0)
                 throw new ArgumentException("capacity must be greater than 0.");
 
+            if (_op.LT(_op.Sub(_op.Max, startId), _op.FromInt(capacity - 1)))
+                throw new ArgumentException("capacity exceeds the available ID range from startId.");
+
             _startId = startId;
             _capacity = capacity;
             _limit = capacity - 1;
