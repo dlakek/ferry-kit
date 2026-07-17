@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using static FerryKit.Core.StringHelper;
@@ -352,11 +353,11 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static bool TryTo<T>(this ReadOnlySpan<char> s, out T r) => Cache<T, Default>.TryParse(s, out r, default);
         [MethodImpl(Opt.Inline)] public static bool TryTo<T, P>(this ReadOnlySpan<char> s, out T r, P p) where P : struct, IParsePolicy => Cache<T, P>.TryParse(s, out r, p);
 
-        [MethodImpl(Opt.Inline)] public static int ToInt(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : int.Parse(s);
-        [MethodImpl(Opt.Inline)] public static long ToLong(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : long.Parse(s);
-        [MethodImpl(Opt.Inline)] public static float ToFloat(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : float.Parse(s);
-        [MethodImpl(Opt.Inline)] public static double ToDouble(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : double.Parse(s);
-        [MethodImpl(Opt.Inline)] public static DateTime ToDateTime(this ReadOnlySpan<char> s) => s.IsEmpty ? default : DateTime.Parse(s);
+        [MethodImpl(Opt.Inline)] public static int ToInt(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : int.Parse(s, NumberStyles.Integer, CultureInfo.InvariantCulture);
+        [MethodImpl(Opt.Inline)] public static long ToLong(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : long.Parse(s, NumberStyles.Integer, CultureInfo.InvariantCulture);
+        [MethodImpl(Opt.Inline)] public static float ToFloat(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : float.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
+        [MethodImpl(Opt.Inline)] public static double ToDouble(this ReadOnlySpan<char> s) => s.IsEmpty ? 0 : double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
+        [MethodImpl(Opt.Inline)] public static DateTime ToDateTime(this ReadOnlySpan<char> s) => s.IsEmpty ? default : DateTime.Parse(s, CultureInfo.InvariantCulture, DateTimeStyles.None);
         [MethodImpl(Opt.Inline)] public static string ToStr(this ReadOnlySpan<char> s) { var r = s.Trim().TrimQuotes().ToString(); return r.Contains("\"\"") ? r.Replace("\"\"", "\"") : r; }
         [MethodImpl(Opt.Inline)] public static bool ToBool(this ReadOnlySpan<char> s) => s.Trim().TryParseForBit(out var r) ? r : bool.Parse(s);
         [MethodImpl(Opt.Inline)] public static T ToEnum<T>(this ReadOnlySpan<char> s) where T : struct, Enum => s.ToEnumImpl<T, Default>();
@@ -366,11 +367,11 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static Dictionary<K, V> ToDictionary<K, V>(this ReadOnlySpan<char> s) => s.ToDictionaryImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
         [MethodImpl(Opt.Inline)] public static (K, V) ToPair<K, V>(this ReadOnlySpan<char> s) => s.ToPairImpl(Cache<K, Default>.Parse, Cache<V, Default>.Parse);
 
-        [MethodImpl(Opt.Inline)] public static bool TryToInt(this ReadOnlySpan<char> s, out int r) => int.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToLong(this ReadOnlySpan<char> s, out long r) => long.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToFloat(this ReadOnlySpan<char> s, out float r) => float.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToDouble(this ReadOnlySpan<char> s, out double r) => double.TryParse(s, out r);
-        [MethodImpl(Opt.Inline)] public static bool TryToDateTime(this ReadOnlySpan<char> s, out DateTime r) => DateTime.TryParse(s, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToInt(this ReadOnlySpan<char> s, out int r) => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToLong(this ReadOnlySpan<char> s, out long r) => long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToFloat(this ReadOnlySpan<char> s, out float r) => float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToDouble(this ReadOnlySpan<char> s, out double r) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out r);
+        [MethodImpl(Opt.Inline)] public static bool TryToDateTime(this ReadOnlySpan<char> s, out DateTime r) => DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToStr(this ReadOnlySpan<char> s, out string r) { r = s.ToStr(); return true; }
         [MethodImpl(Opt.Inline)] public static bool TryToBool(this ReadOnlySpan<char> s, out bool r) => s.Trim().TryParseForBit(out r) || bool.TryParse(s, out r);
         [MethodImpl(Opt.Inline)] public static bool TryToEnum<T>(this ReadOnlySpan<char> s, out T r) where T : struct, Enum => s.TryToEnumImpl<T, Default>(out r);

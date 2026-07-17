@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace FerryKit.Core
@@ -171,35 +172,35 @@ namespace FerryKit.Core
             switch (Cache<T>.UnderlyingTypeCode)
             {
                 case TypeCode.SByte:
-                    bool sbyteParsed = sbyte.TryParse(str, out sbyte sbyteValue);
+                    bool sbyteParsed = sbyte.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out sbyte sbyteValue);
                     result = unchecked((byte)sbyteValue);
                     return sbyteParsed;
                 case TypeCode.Byte:
-                    bool byteParsed = byte.TryParse(str, out byte byteValue);
+                    bool byteParsed = byte.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out byte byteValue);
                     result = byteValue;
                     return byteParsed;
                 case TypeCode.Int16:
-                    bool shortParsed = short.TryParse(str, out short shortValue);
+                    bool shortParsed = short.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out short shortValue);
                     result = unchecked((ushort)shortValue);
                     return shortParsed;
                 case TypeCode.UInt16:
-                    bool ushortParsed = ushort.TryParse(str, out ushort ushortValue);
+                    bool ushortParsed = ushort.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out ushort ushortValue);
                     result = ushortValue;
                     return ushortParsed;
                 case TypeCode.Int32:
-                    bool intParsed = int.TryParse(str, out int intValue);
+                    bool intParsed = int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue);
                     result = unchecked((uint)intValue);
                     return intParsed;
                 case TypeCode.UInt32:
-                    bool uintParsed = uint.TryParse(str, out uint uintValue);
+                    bool uintParsed = uint.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uintValue);
                     result = uintValue;
                     return uintParsed;
                 case TypeCode.Int64:
-                    bool longParsed = long.TryParse(str, out long longValue);
+                    bool longParsed = long.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue);
                     result = unchecked((ulong)longValue);
                     return longParsed;
                 case TypeCode.UInt64:
-                    return ulong.TryParse(str, out result);
+                    return ulong.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
                 default:
                     result = default;
                     return false;
