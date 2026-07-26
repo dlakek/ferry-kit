@@ -12,18 +12,26 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 180
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
     env:
       UNITY_PATH: ${{ vars.UNITY_PATH }}
     steps:
       - uses: actions/checkout@v4
+      - name: Validate runner configuration
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:UNITY_PATH)) {
+              throw "Repository variable UNITY_PATH is not configured."
+          }
+          if (-not (Test-Path -LiteralPath $env:UNITY_PATH -PathType Leaf)) {
+              throw "Unity executable was not found: $env:UNITY_PATH"
+          }
       - name: EditMode
-        shell: powershell
         run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform EditMode
       - name: Standalone Windows 64 IL2CPP High Stripping
-        shell: powershell
         run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform StandaloneWindows64
       - name: Android ARM64 IL2CPP High Stripping
-        shell: powershell
         run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform Android
       - name: Preserve test outputs
         if: always()
