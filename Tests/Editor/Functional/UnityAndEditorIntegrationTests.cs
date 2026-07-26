@@ -17,12 +17,22 @@ namespace FerryKit.Core.Tests.Functional
             var table = ScriptableObject.CreateInstance<TestDataTable>();
             try
             {
-                SetDataList(table, new List<TestDataRow>());
+                Assert.That(table.Count, Is.Zero);
                 Assert.That(table.Load("id,name\n1,one\n2,two"), Is.True);
-                Assert.That(table.DataList.ConvertAll(x => x.Id), Is.EqualTo(new[] { 1, 2 }));
+                Assert.That(table.Count, Is.EqualTo(2));
+                Assert.That(table[0].Id, Is.EqualTo(1));
+                Assert.That(table[1].Id, Is.EqualTo(2));
+                var enumerator = table.GetEnumerator();
+                Assert.That(enumerator.GetType(), Is.EqualTo(typeof(List<TestDataRow>.Enumerator)));
+                int enumerated = 0;
+                while (enumerator.MoveNext())
+                    enumerated += enumerator.Current.Id;
+                Assert.That(enumerated, Is.EqualTo(3));
 
                 LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("parse failed"));
                 Assert.That(table.Load("id,name\ninvalid,row"), Is.False);
+                Assert.That(table.Count, Is.EqualTo(2));
+                Assert.That(table[0].Id, Is.EqualTo(1));
             }
             finally { UnityEngine.Object.DestroyImmediate(table); }
         }
@@ -61,6 +71,31 @@ namespace FerryKit.Core.Tests.Functional
         }
 
         [Test]
+        public void SingletonSearch_DiscoversInactiveInstanceCreatedAfterMiss()
+        {
+            Type closedBase = typeof(SingletonBase<TestSingleton>);
+            MethodInfo reset = closedBase.GetMethod("ResetStatics", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo getInstance = closedBase.GetMethod("GetInstance", BindingFlags.Static | BindingFlags.NonPublic);
+
+            reset.Invoke(null, null);
+            Assert.That(getInstance.Invoke(null, null), Is.Null);
+            Assert.That(getInstance.Invoke(null, null), Is.Null);
+
+            var go = new GameObject("singleton-fast-path");
+            go.SetActive(false);
+            try
+            {
+                var component = go.AddComponent<TestSingleton>();
+                Assert.That(getInstance.Invoke(null, null), Is.SameAs(component));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                reset.Invoke(null, null);
+            }
+        }
+
+        [Test]
         public void DataImporterTypes_PreserveEditorAndSerializationContracts()
         {
             Assert.That(typeof(DataImporter).IsSubclassOf(typeof(EditorWindow)), Is.True);
@@ -70,6 +105,7 @@ namespace FerryKit.Core.Tests.Functional
             var table = ScriptableObject.CreateInstance<TestDataTable>();
             try
             {
+                Assert.That(setting.infoList, Is.Not.Null);
                 setting.infoList = new List<DataImporterSetting.Info>
                 {
                     new DataImporterSetting.Info { source = source, dest = table }
@@ -87,10 +123,6 @@ namespace FerryKit.Core.Tests.Functional
             }
         }
 
-        private static void SetDataList(TestDataTable table, List<TestDataRow> data)
-        {
-            typeof(DataTable<TestDataRow>).GetField("_dataList", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(table, data);
-        }
     }
 
     public sealed class TestSingleton : SingletonStatic<TestSingleton> { }

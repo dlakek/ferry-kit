@@ -9,13 +9,6 @@ namespace FerryKit.Core
     {
         private const int _bufferSizeLimit = 512;
 
-        public enum QuoteEscapeMode : byte
-        {
-            None,
-            Csv,
-            Backslash,
-        }
-
         public static ReadOnlySpan<char> HexTable => "0123456789ABCDEF";
 
         [MethodImpl(Opt.Inline)] public static string Bold(this string str) => str.FormatTag('b');
@@ -29,45 +22,46 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static string Color(this string str, string color) => str.FormatTag("color", color);
         [MethodImpl(Opt.Inline)] public static string Color(this string str, int r, int g, int b) => str.FormatTag(r, g, b);
 
-        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimQuotes(this ReadOnlySpan<char> span) => span.Length > 1 && span[0] == '"' && span[^1] == '"' ? span[1..^1] : span;
-        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimEndOne(this ReadOnlySpan<char> span, char trimChar) => !span.IsEmpty && span[^1] == trimChar ? span[..^1] : span;
-        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimStartOne(this ReadOnlySpan<char> span, char trimChar) => !span.IsEmpty && span[0] == trimChar ? span[1..] : span;
+        [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this char value) => (uint)(value - '0') <= 9 || value == '+' || value == '-';
+        [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this string value) => !string.IsNullOrEmpty(value) && value.IsNumericStartSkipEmptyCheck();
+        [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this ReadOnlySpan<char> value) => !value.IsEmpty && value.IsNumericStartSkipEmptyCheck();
 
-        [MethodImpl(Opt.Inline)]
-        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, QuoteEscapeMode escapeMode = QuoteEscapeMode.None) => escapeMode switch
-        {
-            QuoteEscapeMode.Backslash => span.IndexOfUnquotedWithEscape(value),
-            QuoteEscapeMode.Csv => span.IndexOfUnquotedCsv(value),
-            _ => span.IndexOfUnquotedNoEscape(value),
-        };
+        [MethodImpl(Opt.Inline)] public static bool HasLeadingOrTrailingWhiteSpace(this string value) => !string.IsNullOrEmpty(value) && value.HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck();
+        [MethodImpl(Opt.Inline)] public static bool HasLeadingOrTrailingWhiteSpace(this ReadOnlySpan<char> value) => !value.IsEmpty && value.HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck();
 
-        [MethodImpl(Opt.Inline)]
-        public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, int startIndex, QuoteEscapeMode escapeMode = QuoteEscapeMode.None)
-        {
-            if ((uint)startIndex >= (uint)span.Length)
-                return -1;
+        [MethodImpl(Opt.Inline)] public static bool IsInQuotes(this string value) => value?.Length > 1 && value[0] == '"' && value[^1] == '"';
+        [MethodImpl(Opt.Inline)] public static bool IsInQuotes(this ReadOnlySpan<char> value) => value.Length > 1 && value[0] == '"' && value[^1] == '"';
 
-            var slice = span[startIndex..];
-            int idx = slice.IndexOfUnquoted(value, escapeMode);
-            return idx == -1 ? -1 : startIndex + idx;
-        }
+        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimQuotes(this ReadOnlySpan<char> value) => value.IsInQuotes() ? value[1..^1] : value;
+        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimEndOne(this ReadOnlySpan<char> value, char trimChar) => !value.IsEmpty && value[^1] == trimChar ? value[..^1] : value;
+        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<char> TrimStartOne(this ReadOnlySpan<char> value, char trimChar) => !value.IsEmpty && value[0] == trimChar ? value[1..] : value;
+
+        [MethodImpl(Opt.Inline)] internal static bool IsNumericStartSkipEmptyCheck(this string value) => value[0].IsNumericStart();
+        [MethodImpl(Opt.Inline)] internal static bool IsNumericStartSkipEmptyCheck(this ReadOnlySpan<char> value) => value[0].IsNumericStart();
+
+        [MethodImpl(Opt.Inline)] internal static bool HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck(this string value) => char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]);
+        [MethodImpl(Opt.Inline)] internal static bool HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck(this ReadOnlySpan<char> value) => char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]);
 
         [MethodImpl(Opt.Inline)]
         public static bool HasWhiteSpace(this string str)
         {
-            if (str is null)
+            if (str == null)
                 return false;
 
-            return str.AsSpan().HasWhiteSpace();
+            foreach (var c in str)
+            {
+                if (char.IsWhiteSpace(c))
+                    return true;
+            }
+            return false;
         }
 
         [MethodImpl(Opt.Inline)]
         public static bool HasWhiteSpace(this ReadOnlySpan<char> span)
         {
-            int len = span.Length;
-            for (int i = 0; i < len; ++i)
+            foreach (var c in span)
             {
-                if (char.IsWhiteSpace(span[i]))
+                if (char.IsWhiteSpace(c))
                     return true;
             }
             return false;
@@ -167,10 +161,6 @@ namespace FerryKit.Core
             }
         }
 
-        // ---------------------------------------------------------------------
-        // private
-        // ---------------------------------------------------------------------
-
         private static string FormatTag(this string str, char tag)
         {
             return string.Create(Tag.CharTagLen + str.Length, (str, tag), static (span, state) =>
@@ -205,7 +195,8 @@ namespace FerryKit.Core
         }
 
         /// <summary>
-        /// T is expected to be string or int only
+        /// Callers must supply only <see cref="string"/> or <see cref="int"/> because the implementation
+        /// reinterprets the generic value without a fallback conversion.
         /// </summary>
         private static string FormatTag<T>(this string str, string tag, T value)
         {
@@ -259,87 +250,6 @@ namespace FerryKit.Core
             });
         }
 
-        private static int IndexOfUnquotedNoEscape(this ReadOnlySpan<char> span, char value)
-        {
-            var inQuotes = false;
-            int offset = 0;
-            while (true)
-            {
-                var slice = span[offset..];
-                int idx = inQuotes ? slice.IndexOf('"') : slice.IndexOfAny('"', value);
-                if (idx == -1)
-                    return -1;
-
-                if (slice[idx] != '"')
-                    return offset + idx;
-
-                inQuotes = !inQuotes;
-                offset += idx + 1;
-            }
-        }
-
-        private static int IndexOfUnquotedWithEscape(this ReadOnlySpan<char> span, char value)
-        {
-            var inQuotes = false;
-            int offset = 0;
-            int len = span.Length;
-            while (true)
-            {
-                var slice = span[offset..];
-                int idx = inQuotes ? slice.IndexOfAny('"', '\\') : slice.IndexOfAny('"', value);
-                if (idx == -1)
-                    return -1;
-
-                var c = slice[idx];
-                if (c == '\\')
-                {
-                    offset += idx + 2;
-                    if (offset >= len)
-                        return -1;
-
-                    continue;
-                }
-                if (c != '"')
-                    return offset + idx;
-
-                inQuotes = !inQuotes;
-                offset += idx + 1;
-            }
-        }
-
-        public static int IndexOfUnquotedCsv(this ReadOnlySpan<char> span, char value)
-        {
-            var inQuotes = false;
-            int offset = 0;
-            int len = span.Length;
-            while (offset < len)
-            {
-                var slice = span[offset..];
-                int idx = inQuotes ? slice.IndexOf('"') : slice.IndexOfAny('"', value);
-                if (idx == -1)
-                    return -1;
-
-                if (!inQuotes)
-                {
-                    if (slice[idx] == value)
-                        return offset + idx;
-
-                    inQuotes = true;
-                    offset += idx + 1;
-                    continue;
-                }
-                int next = offset + idx + 1;
-                if (next < len && span[next] == '"')
-                {
-                    offset = next + 1;
-                    continue;
-                }
-                inQuotes = false;
-                offset = next;
-            }
-            return -1;
-        }
-
         [MethodImpl(Opt.Inline)]
         private static Span<char> ApplyTruncate(this Span<char> buffer, ReadOnlySpan<char> span, ReadOnlySpan<char> suffix, int cutLen)
         {
@@ -374,30 +284,37 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         private static int Digits(this int value)
         {
-            if (value == 0) return 1;
+            if (value == 0)
+                return 1;
+
             int count = 0;
             if (value < 0)
             {
-                if (value == int.MinValue) return 11; // -2147483648
+                if (value == int.MinValue)
+                    return 11; // -2147483648
+
                 value = -value;
                 count = 1;
             }
-            // In case of font size input, it is usually smaller than 100, so it is intentionally written like this instead of binary search branch.
-            if (value < 10) return count + 1;
-            if (value < 100) return count + 2;
-            if (value < 1000) return count + 3;
-            if (value < 10000) return count + 4;
-            if (value < 100000) return count + 5;
-            if (value < 1000000) return count + 6;
-            if (value < 10000000) return count + 7;
-            if (value < 100000000) return count + 8;
-            if (value < 1000000000) return count + 9;
-            return count + 10;
+            // This is used for font sizes, which are commonly below 100, so the early switch arms favor that range.
+            return value switch
+            {
+                < 10 => count + 1,
+                < 100 => count + 2,
+                < 1000 => count + 3,
+                < 10000 => count + 4,
+                < 100000 => count + 5,
+                < 1000000 => count + 6,
+                < 10000000 => count + 7,
+                < 100000000 => count + 8,
+                < 1000000000 => count + 9,
+                _ => count + 10
+            };
         }
 
         // ---------------------------------------------------------------------
         // RichText tag structural constants (for compile-time calculations)
-        // Grouping them into a static class improves readability and prevents namespace pollution.
+        // Grouping them keeps the length formulas and call sites explicit.
         // ---------------------------------------------------------------------
         private static class Tag
         {
@@ -413,17 +330,17 @@ namespace FerryKit.Core
             public const int CharTagSuffixLen = Open + Slash + 1 + Close;   // "</t>".Length
             public const int CharTagLen = CharTagPrefixLen + CharTagSuffixLen;
 
-            // 1. string tag: <tag>...</tag> (Excluding tag length)
+            // 2. string tag: <tag>...</tag> (excluding tag length)
             public const int StrTagPrefixLen = Open + Close;           // "<>".Length
             public const int StrTagSuffixLen = Open + Slash + Close;   // "</>".Length
             public const int StrTagLen = StrTagPrefixLen + StrTagSuffixLen;
 
-            // 3. attribute tag: <tag=value>...</tag> (Excluding tag and value length)
+            // 3. attribute tag: <tag=value>...</tag> (excluding tag and value length)
             public const int AttrTagPrefixLen = Open + Eq + Close;      // "<=>".Length
             public const int AttrTagSuffixLen = Open + Slash + Close;   // "</>".Length
             public const int AttrTagLen = AttrTagPrefixLen + AttrTagSuffixLen;
 
-            // 4. Color tag: <color=#RRGGBB>...</color>
+            // 4. color tag: <color=#RRGGBB>...</color>
             public const string ColorHexPrefix = "<color=#";
             public const string ColorSuffix = "</color>";
             public const int ColorHexPrefixLen = 8; // "<color=#".Length

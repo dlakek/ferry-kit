@@ -14,6 +14,6 @@ namespace FerryKit
             public DataTableBase dest;
         }
 
-        public List<Info> infoList;
+        public List<Info> infoList = new();
     }
 }

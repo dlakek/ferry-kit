@@ -7,23 +7,24 @@ namespace FerryKit.Core
 {
     public static class EnumHelper
     {
-        [MethodImpl(Opt.Inline)]
-        public static ReadOnlySpan<T> GetValues<T>() where T : struct, Enum => new(Cache<T>.Values);
+        private const int _linearValueThreshold = 16;
+        private const int _binaryValueThreshold = 64;
 
-        [MethodImpl(Opt.Inline)]
-        public static int Count<T>() where T : struct, Enum => Cache<T>.Count;
+        private static readonly IFormatProvider _format = CultureInfo.InvariantCulture;
 
-        [MethodImpl(Opt.Inline)]
-        public static bool IsDefined<T>(this T value) where T : struct, Enum => Cache<T>.ValueSet.Contains(value);
+        [MethodImpl(Opt.Inline)] public static int Count<T>() where T : struct, Enum => ValueCache<T>.Count;
+        [MethodImpl(Opt.Inline)] public static ReadOnlySpan<T> GetValues<T>() where T : struct, Enum => new(ValueCache<T>.Values);
+        [MethodImpl(Opt.Inline)] public static bool IsDefined<T>(this T value) where T : struct, Enum => ValueLookupCache<T>.Contains(value);
+        [MethodImpl(Opt.Inline)] public static ulong ToUInt64Bits<T>(this T value) where T : struct, Enum => ToUInt64BitsUnchecked(value);
+        [MethodImpl(Opt.Inline)] public static void AccumulateFlag<T>(this ref T target, T next) where T : struct, Enum => AccumulateFlagUnchecked(ref target, next);
 
         [MethodImpl(Opt.Inline)]
         public static bool TrueForAll<T>(Predicate<T> match) where T : struct, Enum
         {
-            var arr = Cache<T>.Values;
-            int len = arr.Length;
-            for (int i = 0; i < len; ++i)
+            var values = ValueCache<T>.Values;
+            for (int i = 0; i < values.Length; ++i)
             {
-                if (!match(arr[i]))
+                if (!match(values[i]))
                     return false;
             }
             return true;
@@ -32,34 +33,93 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void ForEach<T>(Action<T> action) where T : struct, Enum
         {
-            var arr = Cache<T>.Values;
-            int len = arr.Length;
-            for (int i = 0; i < len; ++i)
+            var values = ValueCache<T>.Values;
+            for (int i = 0; i < values.Length; ++i)
             {
-                action(arr[i]);
+                action(values[i]);
             }
         }
 
-        /// <summary>
-        /// Bitwise OR operation (|=) for generic enums
-        /// </summary>
         [MethodImpl(Opt.Inline)]
-        public static void AccumulateFlag<T>(this ref T target, T next) where T : struct, Enum
+        public static T Parse<T>(this string value, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
         {
-            // The storage size is constant for each closed generic enum type,
-            // enabling JIT/AOT compilers to fold the switch to the matching operation.
+            if (!value.TryParse(out T result, ignoreCase, ignoreSpace))
+                return ThrowConvertFailException<T>(value);
+
+            return result;
+        }
+
+        [MethodImpl(Opt.Inline)]
+        public static T Parse<T>(this ReadOnlySpan<char> value, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        {
+            if (!value.TryParse(out T result, ignoreCase, ignoreSpace))
+                return ThrowConvertFailException<T>(value.ToString());
+
+            return result;
+        }
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryParse<T>(this string value, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                result = default;
+                return false;
+            }
+            if (value.HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck())
+            {
+                if (ignoreSpace)
+                    return value.AsSpan().TryParseUnchecked(out result, ignoreCase, ignoreSpace);
+
+                result = default;
+                return false;
+            }
+            if (value.IsNumericStartSkipEmptyCheck())
+                return NumericCache<T>.TryParse(value.AsSpan(), out result);
+
+            return ignoreCase
+                ? StringCache<T, IgnoreCaseMode>.TryGetValue(value, out result)
+                : StringCache<T, OrdinalMode>.TryGetValue(value, out result);
+        }
+
+        [MethodImpl(Opt.Inline)]
+        public static bool TryParse<T>(this ReadOnlySpan<char> value, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        {
+            return value.TryParseUnchecked(out result, ignoreCase, ignoreSpace);
+        }
+
+        [MethodImpl(Opt.Inline)]
+        internal static bool TryParseUnchecked<T>(this ReadOnlySpan<char> value, out T result, bool ignoreCase = false, bool ignoreSpace = true)
+        {
+            var span = ignoreSpace ? value.Trim() : value.HasLeadingOrTrailingWhiteSpace() ? default : value;
+            if (span.IsEmpty)
+            {
+                result = default;
+                return false;
+            }
+            if (span.IsNumericStartSkipEmptyCheck())
+                return NumericCache<T>.TryParse(span, out result);
+
+            return ignoreCase
+                ? SpanCache<T, IgnoreCaseMode>.TryGetValue(span, out result)
+                : SpanCache<T, OrdinalMode>.TryGetValue(span, out result);
+        }
+
+        [MethodImpl(Opt.Inline)]
+        internal static void AccumulateFlagUnchecked<T>(ref T target, T next)
+        {
             _ = Unsafe.SizeOf<T>() switch
             {
                 sizeof(byte) => Unsafe.As<T, byte>(ref target) |= Unsafe.As<T, byte>(ref next),
                 sizeof(ushort) => Unsafe.As<T, ushort>(ref target) |= Unsafe.As<T, ushort>(ref next),
                 sizeof(uint) => Unsafe.As<T, uint>(ref target) |= Unsafe.As<T, uint>(ref next),
                 sizeof(ulong) => Unsafe.As<T, ulong>(ref target) |= Unsafe.As<T, ulong>(ref next),
-                _ => throw CreateUnsupportedEnumSizeException<T>(Unsafe.SizeOf<T>()),
+                _ => ThrowUnsupportedEnumSize<T>(),
             };
         }
 
         [MethodImpl(Opt.Inline)]
-        public static ulong ToUInt64Bits<T>(T value) where T : struct, Enum
+        private static ulong ToUInt64BitsUnchecked<T>(T value)
         {
             return Unsafe.SizeOf<T>() switch
             {
@@ -67,179 +127,269 @@ namespace FerryKit.Core
                 sizeof(ushort) => Unsafe.As<T, ushort>(ref value),
                 sizeof(uint) => Unsafe.As<T, uint>(ref value),
                 sizeof(ulong) => Unsafe.As<T, ulong>(ref value),
-                _ => throw CreateUnsupportedEnumSizeException<T>(Unsafe.SizeOf<T>()),
+                _ => ThrowUnsupportedEnumSize<T>(),
             };
         }
 
-        [MethodImpl(Opt.Inline)]
-        public static T Parse<T>(this string str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        [MethodImpl(Opt.NoInline)]
+        private static T ThrowConvertFailException<T>(string value)
         {
-            if (!str.TryParse(out T result, ignoreCase, ignoreSpace))
-                throw new ArgumentException($"'{str}' could not be converted to enum '{typeof(T)}'.");
-
-            return result;
+            throw new ArgumentException($"'{value}' could not be converted to enum '{typeof(T)}'.");
         }
 
-        [MethodImpl(Opt.Inline)]
-        public static T Parse<T>(this ReadOnlySpan<char> str, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        [MethodImpl(Opt.NoInline)]
+        private static ulong ThrowUnsupportedEnumSize<T>()
         {
-            if (!str.TryParse(out T result, ignoreCase, ignoreSpace))
-                throw new ArgumentException($"'{str.ToString()}' could not be converted to enum '{typeof(T)}'.");
-
-            return result;
+            throw new NotSupportedException($"Enum '{typeof(T)}' uses an unsupported storage size: {Unsafe.SizeOf<T>()} bytes.");
         }
 
-        /// <summary>
-        /// A parsing function that is much more optimized than Enum.TryParse
-        /// </summary>
-        public static bool TryParse<T>(this string str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        private static class ValueCache<T>
         {
-            if (string.IsNullOrEmpty(str))
+            public static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
+            public static readonly int Count = Values.Length;
+        }
+
+        private static class NameCache<T>
+        {
+            public static readonly string[] Values = Enum.GetNames(typeof(T));
+        }
+
+        private static class NumericCache<T>
+        {
+            private const NumberStyles _style = NumberStyles.Integer;
+
+            private static readonly TypeCode _underlyingTypeCode = Type.GetTypeCode(Enum.GetUnderlyingType(typeof(T)));
+
+            public static bool TryParse(ReadOnlySpan<char> str, out T result) => _underlyingTypeCode switch
+            {
+                TypeCode.SByte => TryParsedValue(sbyte.TryParse(str, _style, _format, out sbyte value), value, out result),
+                TypeCode.Byte => TryParsedValue(byte.TryParse(str, _style, _format, out byte value), value, out result),
+                TypeCode.Int16 => TryParsedValue(short.TryParse(str, _style, _format, out short value), value, out result),
+                TypeCode.UInt16 => TryParsedValue(ushort.TryParse(str, _style, _format, out ushort value), value, out result),
+                TypeCode.Int32 => TryParsedValue(int.TryParse(str, _style, _format, out int value), value, out result),
+                TypeCode.UInt32 => TryParsedValue(uint.TryParse(str, _style, _format, out uint value), value, out result),
+                TypeCode.Int64 => TryParsedValue(long.TryParse(str, _style, _format, out long value), value, out result),
+                TypeCode.UInt64 => TryParsedValue(ulong.TryParse(str, _style, _format, out ulong value), value, out result),
+                _ => Fail(out result)
+            };
+
+            [MethodImpl(Opt.Inline)]
+            private static bool TryParsedValue<TValue>(bool success, TValue value, out T result) where TValue : struct => success
+                ? ValueLookupCache<T>.TryGetValue(Unsafe.As<TValue, T>(ref value), out result)
+                : Fail(out result);
+
+            [MethodImpl(Opt.Inline)]
+            private static bool Fail(out T result)
             {
                 result = default;
                 return false;
             }
-            if (!ignoreSpace && (char.IsWhiteSpace(str[0]) || char.IsWhiteSpace(str[^1])))
-            {
-                result = default;
-                return false;
-            }
-            var map = ignoreCase ? Cache<T>.StringMapIgnoreCase : Cache<T>.StringMap;
-            if (map.TryGetValue(str, out result))
-                return true;
-
-            // In case of ignoreSpace, str.Trim() should be used to check,
-            // but to avoid GC occurrence, it is passed on to the Span version and processed.
-            return ignoreSpace
-                ? str.AsSpan().TryParse(out result, ignoreCase, ignoreSpace)
-                : str.AsSpan().TryParseFromNumericForm(out result);
         }
 
-        /// <summary>
-        /// Since the Span version prioritizes preventing GC,
-        /// it cannot be searched using a dictionary, so it uses linear search.
-        /// (This will need to be modified when AlternateLookup in .NET 9 becomes available.)
-        /// </summary>
-        public static bool TryParse<T>(this ReadOnlySpan<char> str, out T result, bool ignoreCase = false, bool ignoreSpace = true) where T : struct, Enum
+        private static class ValueLookupCache<T>
         {
-            var span = ignoreSpace ? str.Trim() : str;
-            if (span.IsEmpty)
+            private enum LookupMode : byte
             {
-                result = default;
-                return false;
+                Linear,
+                Binary,
+                HashSet,
             }
-            int spanLen = span.Length;
-            var option = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            var names = Cache<T>.Names;
-            int count = Cache<T>.Count;
-            for (int i = 0; i < count; ++i)
-            {
-                if (names[i].Length != spanLen)
-                    continue;
 
-                if (span.Equals(names[i], option))
+            private static readonly LookupMode _mode = ValueCache<T>.Count < _linearValueThreshold
+                ? LookupMode.Linear
+                : ValueCache<T>.Count < _binaryValueThreshold
+                    ? LookupMode.Binary
+                    : LookupMode.HashSet;
+
+            private static readonly ulong[] _sortedBits = _mode == LookupMode.HashSet ? null : CreateSortedBits();
+            private static readonly HashSet<T> _values = _mode == LookupMode.HashSet ? new(ValueCache<T>.Values) : null;
+
+            [MethodImpl(Opt.Inline)]
+            public static bool TryGetValue(T value, out T result)
+            {
+                if (Contains(value))
                 {
-                    result = Cache<T>.Values[i];
+                    result = value;
                     return true;
                 }
+                result = default;
+                return false;
             }
-            return span.TryParseFromNumericForm(out result);
+
+            [MethodImpl(Opt.Inline)]
+            public static bool Contains(T value) => _mode switch
+            {
+                LookupMode.Linear => LinearSearch(_sortedBits, ToUInt64BitsUnchecked(value)),
+                LookupMode.Binary => BinarySearch(_sortedBits, ToUInt64BitsUnchecked(value)),
+                LookupMode.HashSet => _values.Contains(value),
+                _ => false,
+            };
+
+            [MethodImpl(Opt.Inline)]
+            private static bool LinearSearch(ulong[] values, ulong target)
+            {
+                for (int i = 0; i < values.Length; ++i)
+                {
+                    if (values[i] == target)
+                        return true;
+                }
+                return false;
+            }
+
+            [MethodImpl(Opt.Inline)]
+            private static bool BinarySearch(ulong[] values, ulong target)
+            {
+                int low = 0;
+                int high = values.Length - 1;
+                while (low <= high)
+                {
+                    int middle = low + ((high - low) >> 1);
+                    var value = values[middle];
+                    if (value == target)
+                        return true;
+
+                    if (value < target)
+                    {
+                        low = middle + 1;
+                    }
+                    else
+                    {
+                        high = middle - 1;
+                    }
+                }
+                return false;
+            }
+
+            private static ulong[] CreateSortedBits()
+            {
+                var values = ValueCache<T>.Values;
+                var result = new ulong[values.Length];
+                for (int i = 0; i < values.Length; ++i)
+                {
+                    result[i] = ToUInt64BitsUnchecked(values[i]);
+                }
+                return result;
+            }
         }
 
-        /// <summary>
-        /// When a string with a numeric value such as "1" is received,
-        /// it is converted if there is a matching value among the actual values ​​of the enum.
-        /// </summary>
-        [MethodImpl(Opt.Inline)]
-        private static bool TryParseFromNumericForm<T>(this ReadOnlySpan<char> str, out T result) where T : struct, Enum
+        private readonly struct OrdinalMode { }
+        private readonly struct IgnoreCaseMode { }
+
+        private static class Compare<TMode>
         {
-            if (str.TryParseUnderlyingValue<T>(out ulong numericValue))
+            public static readonly StringComparer Comparer = typeof(TMode) == typeof(IgnoreCaseMode) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            public static readonly StringComparison Comparison = typeof(TMode) == typeof(IgnoreCaseMode) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        }
+
+        private static class StringCache<T, TMode> where T : struct, Enum
+        {
+            private static readonly Dictionary<string, T> _values = CreateStringCache();
+
+            [MethodImpl(Opt.Inline)]
+            public static bool TryGetValue(string key, out T result) => _values.TryGetValue(key, out result);
+
+            private static Dictionary<string, T> CreateStringCache()
             {
-                int idx = Array.IndexOf(Cache<T>.NumericValues, numericValue, 0);
-                if (idx != -1)
+                var result = new Dictionary<string, T>(ValueCache<T>.Count, Compare<TMode>.Comparer);
+                var values = ValueCache<T>.Values;
+                var names = NameCache<T>.Values;
+                for (int i = 0; i < names.Length; ++i)
                 {
-                    result = Cache<T>.Values[idx];
+                    result.TryAdd(names[i], values[i]);
+                }
+                return result;
+            }
+        }
+
+        private static class SpanCache<T, TMode>
+        {
+            private static readonly int[] _indices = CreateSortedNameIndices();
+
+            [MethodImpl(Opt.Inline)]
+            public static bool TryGetValue(ReadOnlySpan<char> key, out T result)
+            {
+                return _indices == null
+                    ? LinearSearch(key, out result)
+                    : BinarySearch(key, out result);
+            }
+
+            [MethodImpl(Opt.Inline)]
+            private static bool LinearSearch(ReadOnlySpan<char> key, out T result)
+            {
+                var comp = Compare<TMode>.Comparison;
+                var names = NameCache<T>.Values;
+                for (int i = 0; i < names.Length; ++i)
+                {
+                    if (names[i].Length == key.Length && key.Equals(names[i], comp))
+                    {
+                        result = ValueCache<T>.Values[i];
+                        return true;
+                    }
+                }
+                result = default;
+                return false;
+            }
+
+            [MethodImpl(Opt.Inline)]
+            private static bool BinarySearch(ReadOnlySpan<char> key, out T result)
+            {
+                var comp = Compare<TMode>.Comparison;
+                var names = NameCache<T>.Values;
+                var indices = _indices;
+                int found = -1;
+                int low = 0;
+                int high = indices.Length - 1;
+                while (low <= high)
+                {
+                    int middle = low + ((high - low) >> 1);
+                    int index = indices[middle];
+                    int compare = key.CompareTo(names[index].AsSpan(), comp);
+                    if (compare > 0)
+                    {
+                        low = middle + 1;
+                    }
+                    else if (compare < 0)
+                    {
+                        high = middle - 1;
+                    }
+                    else if (comp == StringComparison.OrdinalIgnoreCase)
+                    {
+                        found = index;
+                        high = middle - 1;
+                    }
+                    else
+                    {
+                        result = ValueCache<T>.Values[index];
+                        return true;
+                    }
+                }
+                if (found != -1)
+                {
+                    result = ValueCache<T>.Values[found];
                     return true;
                 }
+                result = default;
+                return false;
             }
-            result = default;
-            return false;
-        }
 
-        [MethodImpl(Opt.Inline)]
-        private static bool TryParseUnderlyingValue<T>(this ReadOnlySpan<char> str, out ulong result) where T : struct, Enum
-        {
-            switch (Cache<T>.UnderlyingTypeCode)
+            private static int[] CreateSortedNameIndices()
             {
-                case TypeCode.SByte:
-                    bool sbyteParsed = sbyte.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out sbyte sbyteValue);
-                    result = unchecked((byte)sbyteValue);
-                    return sbyteParsed;
-                case TypeCode.Byte:
-                    bool byteParsed = byte.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out byte byteValue);
-                    result = byteValue;
-                    return byteParsed;
-                case TypeCode.Int16:
-                    bool shortParsed = short.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out short shortValue);
-                    result = unchecked((ushort)shortValue);
-                    return shortParsed;
-                case TypeCode.UInt16:
-                    bool ushortParsed = ushort.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out ushort ushortValue);
-                    result = ushortValue;
-                    return ushortParsed;
-                case TypeCode.Int32:
-                    bool intParsed = int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue);
-                    result = unchecked((uint)intValue);
-                    return intParsed;
-                case TypeCode.UInt32:
-                    bool uintParsed = uint.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint uintValue);
-                    result = uintValue;
-                    return uintParsed;
-                case TypeCode.Int64:
-                    bool longParsed = long.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue);
-                    result = unchecked((ulong)longValue);
-                    return longParsed;
-                case TypeCode.UInt64:
-                    return ulong.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
-                default:
-                    result = default;
-                    return false;
-            }
-        }
+                int count = ValueCache<T>.Count;
+                if (count < _linearValueThreshold)
+                    return null;
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static NotSupportedException CreateUnsupportedEnumSizeException<T>(int size) where T : struct, Enum
-            => new($"Enum '{typeof(T)}' uses an unsupported storage size: {size} bytes.");
-
-        private static class Cache<T> where T : struct, Enum
-        {
-            public static readonly T[] Values;
-            public static readonly int Count;
-            public static readonly string[] Names;
-            public static readonly ulong[] NumericValues;
-            public static readonly TypeCode UnderlyingTypeCode;
-            public static readonly HashSet<T> ValueSet;
-            public static readonly Dictionary<string, T> StringMap;
-            public static readonly Dictionary<string, T> StringMapIgnoreCase;
-
-            static Cache()
-            {
-                Values = (T[])Enum.GetValues(typeof(T));
-                Count = Values.Length;
-                Names = Enum.GetNames(typeof(T));
-                NumericValues = new ulong[Count];
-                UnderlyingTypeCode = Type.GetTypeCode(Enum.GetUnderlyingType(typeof(T)));
-                ValueSet = new(Values);
-                StringMap = new(Count);
-                StringMapIgnoreCase = new(Count, StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < Count; ++i)
+                var names = NameCache<T>.Values;
+                var indices = new int[count];
+                for (int i = 0; i < count; ++i)
                 {
-                    var val = Values[i];
-                    var name = Names[i];
-                    NumericValues[i] = ToUInt64Bits(val);
-                    StringMap.Add(name, val);
-                    StringMapIgnoreCase.TryAdd(name, val); // ignore case allows duplicates (first value takes precedence)
+                    indices[i] = i;
                 }
+                indices.Sort((left, right) =>
+                {
+                    int comparison = Compare<TMode>.Comparer.Compare(names[left], names[right]);
+                    return comparison != 0 ? comparison : left.CompareTo(right);
+                });
+                return indices;
             }
         }
     }

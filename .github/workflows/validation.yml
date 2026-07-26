@@ -1,0 +1,36 @@
+name: FerryKit validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unity-tests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Windows, Unity-6000.3, Android-ARM64]
+    timeout-minutes: 180
+    env:
+      UNITY_PATH: ${{ vars.UNITY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: EditMode
+        shell: powershell
+        run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform EditMode
+      - name: Standalone Windows 64 IL2CPP High Stripping
+        shell: powershell
+        run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform StandaloneWindows64
+      - name: Android ARM64 IL2CPP High Stripping
+        shell: powershell
+        run: ./Tools~/Run-UnityTests.ps1 -UnityPath $env:UNITY_PATH -Platform Android
+      - name: Preserve test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferry-kit-unity-validation
+          path: |
+            UnityProject~/TestResults/**
+            UnityProject~/Logs/**
+          if-no-files-found: warn

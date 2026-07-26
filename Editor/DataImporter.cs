@@ -169,7 +169,6 @@ namespace FerryKit
             finally
             {
                 EditorUtility.ClearProgressBar();
-                AssetDatabase.SaveAssets();
             }
         }
 
@@ -191,6 +190,7 @@ namespace FerryKit
                 if (setting.dest.Load(setting.source.text))
                 {
                     EditorUtility.SetDirty(setting.dest);
+                    AssetDatabase.SaveAssetIfDirty(setting.dest);
                     Debug.Log($"✅ Imported: {setting.source.name} to {setting.dest.name}. index: {index}");
                 }
                 else

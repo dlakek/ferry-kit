@@ -7,9 +7,9 @@ using UnityEngine;
 namespace FerryKit
 {
     /// <summary>
-    /// A top-level abstract class that contains the common logic for all singletons (lifecycle, destruction prevention, finalization).
+    /// Contains shared singleton lifecycle, duplicate destruction, lookup, and application-quit handling.
     /// Do not inherit directly; instead, inherit from SingletonDynamic<T> or SingletonStatic<T>.
-    /// Forces inlining optimization to eliminate the overhead of calling GetInstance().
+    /// The cached lookup stays on an inlineable hot path while creation and logging remain cold paths.
     /// </summary>
     public abstract class SingletonBase<T> : MonoBehaviour where T : SingletonBase<T>
     {
@@ -109,7 +109,8 @@ namespace FerryKit
     }
 
     /// <summary>
-    /// A registry that tracks all singleton types and resets their static fields when the application is reloaded.
+    /// Tracks initialized singleton types and resets their static state during subsystem registration,
+    /// including when Unity enters Play Mode with domain reload disabled.
     /// </summary>
     internal static class SingletonResetRegistry
     {

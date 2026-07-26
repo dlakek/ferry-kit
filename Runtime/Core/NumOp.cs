@@ -4,8 +4,8 @@ using System.Runtime.CompilerServices;
 namespace FerryKit.Core
 {
     /// <summary>
-    /// Abstraction of numeric operations (virtual function calls and boxing can be eliminated through struct constraints)
-    /// When Unity supports C# 11 or later, it will be replaced with the language-specific INumber.
+    /// Defines numeric operations for generic algorithms that constrain the operator implementation to a struct,
+    /// avoiding boxing and enabling the runtime or AOT compiler to specialize calls.
     /// </summary>
     public interface INumOp<T>
     {
@@ -84,7 +84,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public readonly int ToInt(uint a) => a > int.MaxValue ? Throw(a) : (int)a;
         [MethodImpl(Opt.Inline)] public readonly uint FromInt(int a) => a < 0 ? Throw(a) : (uint)a;
 
-        // Separate the throw statement into a separate function to avoid interfering with the inlining optimization of the ToInt function.
+        // Keep exceptional paths separate from the inlineable conversion methods.
         private static int Throw(uint a) => throw new ArgumentOutOfRangeException(nameof(a), $"arg {a} is out of bounds.");
         private static uint Throw(int a) => throw new ArgumentOutOfRangeException(nameof(a), $"arg {a} is out of bounds.");
     }

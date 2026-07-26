@@ -5,5 +5,6 @@ namespace FerryKit.Core
     public static class Opt
     {
         public const MethodImplOptions Inline = MethodImplOptions.AggressiveInlining;
+        public const MethodImplOptions NoInline = MethodImplOptions.NoInlining;
     }
 }

@@ -11,21 +11,21 @@ namespace FerryKit.Core.Tests.Functional
         public void ArrayHelpers_CoverSearchMutationProjectionAndBounds()
         {
             int[] values = { 3, 1, 2, 1 };
-                Assert.That(ArrayHelper.IndexOf(values, 1), Is.EqualTo(1));
-                Assert.That(ArrayHelper.IndexOf(values, 1, 2), Is.EqualTo(3));
-                Assert.That(ArrayHelper.IndexOf(values, 1, 1, 2), Is.EqualTo(1));
-                Assert.That(ArrayHelper.LastIndexOf(values, 1), Is.EqualTo(3));
-                Assert.That(ArrayHelper.LastIndexOf(values, 1, 2), Is.EqualTo(1));
-                Assert.That(ArrayHelper.LastIndexOf(values, 1, 3, 3), Is.EqualTo(3));
-                Assert.That(ArrayHelper.Contains(values, 2), Is.True);
-                Assert.That(ArrayHelper.FindIndex(values, x => x == 2), Is.EqualTo(2));
-                Assert.That(ArrayHelper.FindIndex(values, 2, x => x == 1), Is.EqualTo(3));
-                Assert.That(ArrayHelper.FindLastIndex(values, x => x == 1), Is.EqualTo(3));
-                Assert.That(ArrayHelper.Find(values, x => x > 2), Is.EqualTo(3));
-                Assert.That(ArrayHelper.FindLast(values, x => x == 1), Is.EqualTo(1));
-                Assert.That(ArrayHelper.Exists(values, x => x == 9), Is.False);
-                Assert.That(ArrayHelper.TrueForAll(values, x => x > 0), Is.True);
-                Assert.That(ArrayHelper.GetOrDefault(values, -1), Is.Zero);
+            Assert.That(ArrayHelper.IndexOf(values, 1), Is.EqualTo(1));
+            Assert.That(ArrayHelper.IndexOf(values, 1, 2), Is.EqualTo(3));
+            Assert.That(ArrayHelper.IndexOf(values, 1, 1, 2), Is.EqualTo(1));
+            Assert.That(ArrayHelper.LastIndexOf(values, 1), Is.EqualTo(3));
+            Assert.That(ArrayHelper.LastIndexOf(values, 1, 2), Is.EqualTo(1));
+            Assert.That(ArrayHelper.LastIndexOf(values, 1, 3, 3), Is.EqualTo(3));
+            Assert.That(ArrayHelper.Contains(values, 2), Is.True);
+            Assert.That(ArrayHelper.FindIndex(values, x => x == 2), Is.EqualTo(2));
+            Assert.That(ArrayHelper.FindIndex(values, 2, x => x == 1), Is.EqualTo(3));
+            Assert.That(ArrayHelper.FindLastIndex(values, x => x == 1), Is.EqualTo(3));
+            Assert.That(ArrayHelper.Find(values, x => x > 2), Is.EqualTo(3));
+            Assert.That(ArrayHelper.FindLast(values, x => x == 1), Is.EqualTo(1));
+            Assert.That(ArrayHelper.Exists(values, x => x == 9), Is.False);
+            Assert.That(ArrayHelper.TrueForAll(values, x => x > 0), Is.True);
+            Assert.That(ArrayHelper.GetOrDefault(values, -1), Is.Zero);
             Assert.That(ArrayHelper.GetOrDefault(values, 99), Is.Zero);
 
             CollectionAssert.AreEqual(new[] { 3, 2 }, ArrayHelper.FindAll(values, x => x > 1));
@@ -92,6 +92,81 @@ namespace FerryKit.Core.Tests.Functional
             dictionary.Keys.ForEach(_ => keyCount++);
             dictionary.Values.ForEach(_ => valueCount++);
             Assert.That(new[] { pairCount, keyCount, valueCount, twoArgCount }, Is.All.EqualTo(3));
+        }
+
+        [Test]
+        public void ListAppend_UsesGeometricCapacityGrowth()
+        {
+            var list = new List<int>();
+            int capacityChanges = 0;
+            int previousCapacity = list.Capacity;
+            for (int i = 0; i < 4096; ++i)
+            {
+                list.Append(1, i);
+                if (list.Capacity != previousCapacity)
+                {
+                    ++capacityChanges;
+                    previousCapacity = list.Capacity;
+                }
+            }
+            Assert.That(capacityChanges, Is.LessThanOrEqualTo(12));
+            Assert.That(list.Count, Is.EqualTo(4096));
+        }
+
+        [Test]
+        public void ListAppend_NegativeCount_PreservesPreviousNoOpBehavior()
+        {
+            var list = new List<int> { 1, 2 };
+            int creatorCalls = 0;
+
+            list.Append(-1, 3);
+            list.Append(-1, () =>
+            {
+                ++creatorCalls;
+                return 4;
+            });
+
+            Assert.That(list, Is.EqualTo(new[] { 1, 2 }));
+            Assert.That(creatorCalls, Is.Zero);
+        }
+
+        [Test]
+        public void TextParser_DefaultReserve_DoesNotOverAllocateLongSingleRows()
+        {
+            string longValue = new string('x', 32_000);
+            Assert.That(TextParser.TryParse<LongRow>($"1,{longValue}", out var rows, out string reason), Is.True, reason);
+            Assert.That(rows, Has.Count.EqualTo(1));
+            Assert.That(rows.Capacity, Is.LessThanOrEqualTo(16));
+        }
+
+        [Test]
+        public void TextParser_DefaultReserve_DoesNotCountQuotedNewlinesAsRows()
+        {
+            string multilineValue = string.Join("\n", Enumerable.Repeat("x", 3_000));
+            Assert.That(TextParser.TryParse<LongRow>($"1,\"{multilineValue}\"", out var rows, out string reason), Is.True, reason);
+            Assert.That(rows, Has.Count.EqualTo(1));
+            Assert.That(rows[0].Value, Is.EqualTo(multilineValue));
+            Assert.That(rows.Capacity, Is.LessThanOrEqualTo(16));
+        }
+
+        [Test]
+        public void TextParser_DefaultReserve_PreallocatesLargeTables()
+        {
+            const int rowCount = 300;
+            string row = $"1,{new string('x', 48)}";
+            string table = string.Join("\n", Enumerable.Repeat(row, rowCount));
+
+            Assert.That(TextParser.TryParse<LongRow>(table, out var rows, out string reason), Is.True, reason);
+            Assert.That(rows, Has.Count.EqualTo(rowCount));
+            Assert.That(rows.Capacity, Is.GreaterThanOrEqualTo(rowCount));
+            Assert.That(rows.Capacity, Is.LessThan(512));
+        }
+
+        public sealed class LongRow : ITryParsable
+        {
+            public int Id;
+            public string Value;
+            public bool TryParse(ref LineReader reader) => reader.TryRead(out Id) && reader.TryRead(out Value);
         }
 
         private sealed class Box { public int Value; }

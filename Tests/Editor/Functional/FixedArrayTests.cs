@@ -1,9 +1,9 @@
+using FerryKit.Core;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using FerryKit.Core;
-using NUnit.Framework;
 
 namespace FerryKit.Tests.Functional
 {
@@ -27,7 +27,7 @@ namespace FerryKit.Tests.Functional
         [Test]
         public void FixedArrayParsing_RespectsPolicyAndFailureSemantics()
         {
-            var policy = new ParseHelper.Custom(arrSep: '/');
+            var policy = new CustomPolicy(arrSep: '/');
 
             var values = new FixedArray4<int>();
             Assert.That(values.TryParse("1/2/3".AsSpan(), policy), Is.True);
@@ -62,13 +62,33 @@ namespace FerryKit.Tests.Functional
         public void Indexer_RejectsAccessBeyondCapacityWhenSerializedCountIsCorrupted()
         {
             var values = new FixedArray4<int>();
-            Assert.That(values.TryParse("1;2;3;4".AsSpan(), default(ParseHelper.Default)), Is.True);
+            Assert.That(values.TryParse("1;2;3;4".AsSpan(), default(DefaultPolicy)), Is.True);
 
             values = SetCount(values, uint.MaxValue);
 
             Assert.That(values[3], Is.EqualTo(4));
             Assert.That(values[4], Is.Zero);
             Assert.That(values[-1], Is.Zero);
+        }
+
+        [Test]
+        public void Indexer_ReadsFromReadonlyContext()
+        {
+            var values = new FixedArray4<int>();
+            Assert.That(values.TryParse("1;2;3;4".AsSpan()), Is.True);
+            Assert.That(ReadAt(in values, 2), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void BuiltinParser_SupportsAdditionalUnmanagedNumericTypes()
+        {
+            var bytes = new FixedArray2<byte>();
+            Assert.That(bytes.TryParse("1;255".AsSpan()), Is.True);
+            Assert.That(bytes[1], Is.EqualTo(byte.MaxValue));
+
+            var uints = new FixedArray2<uint>();
+            Assert.That(uints.TryParse("1;4294967295".AsSpan()), Is.True);
+            Assert.That(uints[1], Is.EqualTo(uint.MaxValue));
         }
 
         [Test]
@@ -99,6 +119,8 @@ namespace FerryKit.Tests.Functional
             typeof(TArray).GetField("_count", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(boxed, count);
             return (TArray)boxed;
         }
+
+        private static int ReadAt(in FixedArray4<int> values, int index) => values[index];
 
         private static void AssertContiguousItems<TArray, TItem>(int capacity)
             where TArray : struct

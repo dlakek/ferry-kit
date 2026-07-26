@@ -161,8 +161,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static bool TrueForAll<T>(this T[] collection, Predicate<T> match)
         {
-            int len = collection.Length;
-            for (int i = 0; i < len; ++i)
+            for (int i = 0; i < collection.Length; ++i)
             {
                 if (!match(collection[i]))
                     return false;
@@ -173,8 +172,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void ForEach<T>(this T[] collection, Action<T> action)
         {
-            int len = collection.Length;
-            for (int i = 0; i < len; ++i)
+            for (int i = 0; i < collection.Length; ++i)
             {
                 action(collection[i]);
             }
@@ -183,8 +181,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void ForEach<T>(this T[] collection, Action<T, int> action)
         {
-            int len = collection.Length;
-            for (int i = 0; i < len; ++i)
+            for (int i = 0; i < collection.Length; ++i)
             {
                 action(collection[i], i);
             }
@@ -193,9 +190,8 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static T[] FindAll<T>(this T[] collection, Predicate<T> match)
         {
-            int len = collection.Length;
-            var list = new List<T>(len);
-            for (int i = 0; i < len; ++i)
+            var list = new List<T>(collection.Length);
+            for (int i = 0; i < collection.Length; ++i)
             {
                 if (match(collection[i]))
                 {
@@ -208,9 +204,8 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static TOutput[] ConvertAll<T, TOutput>(this T[] collection, Converter<T, TOutput> converter)
         {
-            int len = collection.Length;
-            var output = new TOutput[len];
-            for (int i = 0; i < len; ++i)
+            var output = new TOutput[collection.Length];
+            for (int i = 0; i < collection.Length; ++i)
             {
                 output[i] = converter(collection[i]);
             }

@@ -12,9 +12,9 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// An ID pool implementation that allocates IDs in a circular fashion within a range.
-    /// When the range ends, allocation begins again from the starting ID.
-    /// This is suitable when previously allocated IDs are guaranteed to have short lifetimes and returning to the starting ID is expected to be free of conflicts.
+    /// Allocates IDs in a circular fashion within an inclusive range.
+    /// After returning the maximum ID, the next allocation returns the starting ID.
+    /// Use this only when wrapping cannot collide with IDs that are still in use.
     /// </summary>
     public class CircularIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -50,9 +50,9 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// An ID pool implementation that allocates IDs within a scope and returns used IDs, allowing them to be recycled.
-    /// No more IDs can be allocated when all IDs within the scope are in use.
-    /// Suitable for cases where the lifetime of allocated IDs is long or uncertain.
+    /// Allocates IDs within an inclusive range and recycles IDs after <see cref="ReleaseId(T)"/>.
+    /// Allocation fails while every ID in the range is in use.
+    /// This is suitable when allocated IDs have long or unpredictable lifetimes.
     /// </summary>
     public class RecyclableIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -102,9 +102,9 @@ namespace FerryKit.Core
     }
 
     /// <summary>
-    /// An ID pool implementation that serves the same purpose as RecyclableIdPool, but uses a BitArray to track ID allocation status.
-    /// Suitable for those seeking to optimize memory usage as much as possible compared to RecyclableIdPool.
-    /// Recommended only when the number of IDs expected to remain allocated is expected to be relatively small.
+    /// Tracks a fixed, contiguous ID range with a <see cref="BitArray"/>.
+    /// This avoids per-entry hash and stack storage and is most suitable for bounded ranges where
+    /// allocating one bit for every possible ID is acceptable.
     /// </summary>
     public class BitArrayIdPool<T, TOp> : IIdPool<T>
         where T : struct
@@ -141,7 +141,7 @@ namespace FerryKit.Core
 
         public T NextId()
         {
-            // Basically, it converges to O(1) and has a time complexity of O(n) in the worst case.
+            // The next free bit is O(1) when found immediately and O(capacity) in the worst case.
             int idx = _curIdx;
             for (int i = 0; i < _capacity; ++i)
             {

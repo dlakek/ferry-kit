@@ -14,17 +14,20 @@ namespace FerryKit
 
     public abstract class DataTable<T> : DataTableBase where T : ITryParsable, new()
     {
-        [SerializeField] private List<T> _dataList;
+        [SerializeField] private List<T> _dataList = new();
 
-        public List<T> DataList => _dataList;
+        public int Count => _dataList.Count;
+        public T this[int index] => _dataList[index];
+        public List<T>.Enumerator GetEnumerator() => _dataList.GetEnumerator();
 
         public override bool Load(string source)
         {
-            if (!TextParser.TryParse(source, _dataList, out string reason, _reserveLine, true))
+            if (!TextParser.TryParse(source, out List<T> parsed, out string reason, _reserveLine, true))
             {
                 DevLog.LogError(reason);
                 return false;
             }
+            _dataList = parsed;
             return true;
         }
     }

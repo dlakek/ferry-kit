@@ -37,10 +37,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void Append<T>(this List<T> collection, int count, T value = default)
         {
-            if (collection.Capacity < collection.Count + count)
-            {
-                collection.Capacity = collection.Count + count;
-            }
+            EnsureAppendCapacity(collection, count);
             for (int i = 0; i < count; ++i)
             {
                 collection.Add(value);
@@ -50,10 +47,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static void Append<T>(this List<T> collection, int count, Func<T> creator)
         {
-            if (collection.Capacity < collection.Count + count)
-            {
-                collection.Capacity = collection.Count + count;
-            }
+            EnsureAppendCapacity(collection, count);
             for (int i = 0; i < count; ++i)
             {
                 collection.Add(creator());
@@ -87,6 +81,20 @@ namespace FerryKit.Core
             {
                 action(e, ++i);
             }
+        }
+
+        [MethodImpl(Opt.Inline)]
+        private static void EnsureAppendCapacity<T>(List<T> collection, int appendCount)
+        {
+            if (appendCount <= 0)
+                return;
+
+            int capacity = collection.Capacity;
+            int required = checked(collection.Count + appendCount);
+            if (required <= capacity)
+                return;
+
+            collection.Capacity = Math.Max(required, capacity == 0 ? 4 : capacity > int.MaxValue / 2 ? int.MaxValue : capacity * 2);
         }
     }
 }

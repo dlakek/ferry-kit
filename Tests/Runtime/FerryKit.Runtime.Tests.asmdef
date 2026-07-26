@@ -1,0 +1,18 @@
+{
+    "name": "FerryKit.Runtime.Tests",
+    "rootNamespace": "FerryKit.Tests",
+    "references": [
+        "GUID:4612c626a427f434a8d4c032c189175d",
+        "GUID:dbfe6d966be108d40b994a2b5d947cf0"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}
