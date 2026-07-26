@@ -15,6 +15,30 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 if (-not (Test-Path -LiteralPath $UnityPath -PathType Leaf)) {
     throw "Unity executable was not found: $UnityPath"
 }
+
+function Invoke-Unity([string[]] $ArgumentList) {
+    $commandLine = ($ArgumentList | ForEach-Object {
+        if ($_.Contains('"')) {
+            throw "Unity command-line arguments cannot contain double quotes: $_"
+        }
+        '"' + $_ + '"'
+    }) -join ' '
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $UnityPath
+    $startInfo.Arguments = $commandLine
+    $startInfo.UseShellExecute = $false
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    try {
+        $process.WaitForExit()
+        return $process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 $project = [IO.Path]::GetFullPath($ProjectPath)
 $output = [IO.Path]::GetFullPath($OutputPath)
 New-Item -ItemType Directory -Force -Path $output | Out-Null
@@ -28,10 +52,15 @@ $arguments = @(
 )
 
 if ($Platform -ne 'EditMode') {
-    & $UnityPath -batchmode -nographics -projectPath $project `
-        -executeMethod FerryKit.CI.PlayerConfiguration.Configure -quit `
-        -logFile (Join-Path $output "$Platform-configure.log")
-    if ($LASTEXITCODE -ne 0) { throw "Player configuration failed with exit code $LASTEXITCODE." }
+    $configureArguments = @(
+        '-batchmode', '-nographics', '-projectPath', $project,
+        '-executeMethod', 'FerryKit.CI.PlayerConfiguration.Configure', '-quit',
+        '-logFile', (Join-Path $output "$Platform-configure.log")
+    )
+    $configureExitCode = Invoke-Unity -ArgumentList $configureArguments
+    if ($configureExitCode -ne 0) {
+        throw "Player configuration failed with exit code $configureExitCode."
+    }
 
     $buildName = if ($Platform -eq 'Android') { 'FerryKitTests.apk' } else { 'FerryKitTests.exe' }
     $settings = Join-Path $project "ProjectSettings\TestSettings-$Platform.json"
@@ -41,8 +70,8 @@ if ($Platform -ne 'EditMode') {
 if (Test-Path -LiteralPath $result) {
     Remove-Item -LiteralPath $result -Force
 }
-& $UnityPath @arguments
-if ($LASTEXITCODE -ne 0) { throw "Unity $Platform tests failed with exit code $LASTEXITCODE. See $log" }
+$testExitCode = Invoke-Unity -ArgumentList $arguments
+if ($testExitCode -ne 0) { throw "Unity $Platform tests failed with exit code $testExitCode. See $log" }
 if (-not (Test-Path -LiteralPath $result)) { throw "Unity did not create the expected result file: $result" }
 
 try {
