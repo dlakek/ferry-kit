@@ -1,4 +1,4 @@
 {
   "scriptingBackend": "IL2CPP",
-  "architecture": 2
+  "architecture": "ARM64"
 }
