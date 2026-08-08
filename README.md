@@ -79,16 +79,6 @@ foreach (var row in table)
 
 ## Validation
 
-`UnityProject~` is the minimal Unity 6 test host. On a licensed machine with the required platform modules, run:
+This repository does not include a Unity test host or automated test runner. Run validation locally from the Unity project that consumes this package.
 
-```powershell
-./Tools~/Run-UnityTests.ps1 -UnityPath 'C:\Program Files\Unity\Hub\Editor\6000.3.x\Editor\Unity.exe' -Platform EditMode
-./Tools~/Run-UnityTests.ps1 -UnityPath 'C:\Program Files\Unity\Hub\Editor\6000.3.x\Editor\Unity.exe' -Platform StandaloneWindows64
-./Tools~/Run-UnityTests.ps1 -UnityPath 'C:\Program Files\Unity\Hub\Editor\6000.3.x\Editor\Unity.exe' -Platform Android
-```
-
-Player runs configure IL2CPP with High managed stripping; Android is restricted to ARM64. XML results, logs, and built players are written under `UnityProject~/TestResults`. The script rejects missing, malformed, empty, failed, or inconclusive NUnit results.
-
-The GitHub Actions workflow uses a persistent self-hosted runner, so automatic pull-request validation is limited to branches in this repository. Fork pull requests are intentionally skipped and require a separately trusted validation path.
-
-Tests marked `Explicit` are benchmark probes and are skipped by the standard validation commands; run them explicitly when collecting performance measurements.
+Tests marked `Explicit` are benchmark probes; run them explicitly when collecting performance measurements.

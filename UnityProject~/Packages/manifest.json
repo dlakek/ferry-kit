@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "com.dlakek.ferry-kit": "file:../..",
-    "com.unity.test-framework.performance": "3.2.0"
-  },
-  "testables": [
-    "com.dlakek.ferry-kit"
-  ]
-}

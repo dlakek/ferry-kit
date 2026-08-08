@@ -102,12 +102,3 @@ InitTestScene*.unity*
 # This includes Unity-generated .meta files.
 /FerryKitTest/
 /FerryKitTest.meta
-
-# Committed CI/local validation host; ignore only Unity-generated state.
-/UnityProject~/Library/
-/UnityProject~/Temp/
-/UnityProject~/Logs/
-/UnityProject~/Obj/
-/UnityProject~/UserSettings/
-/UnityProject~/TestResults/
-/UnityProject~/Builds/
