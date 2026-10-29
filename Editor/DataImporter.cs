@@ -43,11 +43,19 @@ namespace FerryKit
             if (_settingAsset != null)
                 return;
 
+            _settingAsset = AssetDatabase.LoadAssetAtPath<DataImporterSetting>(_defaultSettingFullName);
+            if (_settingAsset != null)
+                return;
+
             var guids = AssetDatabase.FindAssets($"t:{nameof(DataImporterSetting)}");
-            if (guids.Length > 0)
+            if (guids.Length == 1)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guids[0]);
                 _settingAsset = AssetDatabase.LoadAssetAtPath<DataImporterSetting>(path);
+            }
+            else if (guids.Length > 1)
+            {
+                Debug.LogWarning("Multiple DataImporterSetting assets were found. Select the Setting Asset explicitly.");
             }
         }
 
@@ -67,13 +75,20 @@ namespace FerryKit
 
         private void CreateSettingsAsset()
         {
-            if (!Directory.Exists(_defaultSettingPath))
+            _settingAsset = AssetDatabase.LoadAssetAtPath<DataImporterSetting>(_defaultSettingFullName);
+            if (_settingAsset != null)
+                return;
+
+            string directoryPath = Path.Combine(Application.dataPath, "Datas", "Editor");
+            if (File.Exists(Path.Combine(directoryPath, _defaultSettingName)))
             {
-                Directory.CreateDirectory(_defaultSettingPath);
+                Debug.LogWarning($"An existing file already occupies {_defaultSettingFullName}.");
+                return;
             }
+            Directory.CreateDirectory(directoryPath);
             _settingAsset = CreateInstance<DataImporterSetting>();
             AssetDatabase.CreateAsset(_settingAsset, _defaultSettingFullName);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(_settingAsset);
             AssetDatabase.Refresh();
             Debug.Log($"📄 Setting Asset created: {_defaultSettingFullName}");
         }
@@ -147,23 +162,12 @@ namespace FerryKit
         {
             try
             {
-                if (selectedIndices != null)
+                int count = selectedIndices?.Count ?? _settingAsset.infoList.Count;
+                for (int i = 0; i < count; ++i)
                 {
-                    int count = selectedIndices.Count;
-                    for (int i = 0; i < count; ++i)
-                    {
-                        if (!Import(selectedIndices[i], i, count))
-                            break;
-                    }
-                }
-                else
-                {
-                    int count = _settingAsset.infoList.Count;
-                    for (int i = 0; i < count; ++i)
-                    {
-                        if (!Import(i, i, count))
-                            break;
-                    }
+                    int index = selectedIndices != null ? selectedIndices[i] : i;
+                    if (!Import(index, i, count))
+                        break;
                 }
             }
             finally

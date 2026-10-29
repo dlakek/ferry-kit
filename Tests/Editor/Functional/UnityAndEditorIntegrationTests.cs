@@ -96,6 +96,30 @@ namespace FerryKit.Core.Tests.Functional
         }
 
         [Test]
+        public void SingletonSearch_DropsDestroyedInactiveCachedInstances()
+        {
+            Type closedBase = typeof(SingletonBase<TestInactiveSingleton>);
+            MethodInfo reset = closedBase.GetMethod("ResetStatics", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo getInstance = closedBase.GetMethod("GetInstance", BindingFlags.Static | BindingFlags.NonPublic);
+            reset.Invoke(null, null);
+            var go = new GameObject("singleton-inactive-cache");
+            go.SetActive(false);
+            try
+            {
+                var component = go.AddComponent<TestInactiveSingleton>();
+                Assert.That(getInstance.Invoke(null, null), Is.SameAs(component));
+                UnityEngine.Object.DestroyImmediate(go);
+                Assert.That(getInstance.Invoke(null, null), Is.Null);
+            }
+            finally
+            {
+                if (go != null)
+                    UnityEngine.Object.DestroyImmediate(go);
+                reset.Invoke(null, null);
+            }
+        }
+
+        [Test]
         public void DataImporterTypes_PreserveEditorAndSerializationContracts()
         {
             Assert.That(typeof(DataImporter).IsSubclassOf(typeof(EditorWindow)), Is.True);
@@ -126,6 +150,8 @@ namespace FerryKit.Core.Tests.Functional
     }
 
     public sealed class TestSingleton : SingletonStatic<TestSingleton> { }
+
+    public sealed class TestInactiveSingleton : SingletonStatic<TestInactiveSingleton> { }
 
     public sealed class TestDataTable : DataTable<TestDataRow> { }
 

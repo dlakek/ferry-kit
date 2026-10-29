@@ -91,18 +91,21 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         internal static bool TryParseUnchecked<T>(this ReadOnlySpan<char> value, out T result, bool ignoreCase = false, bool ignoreSpace = true)
         {
-            var span = ignoreSpace ? value.Trim() : value.HasLeadingOrTrailingWhiteSpace() ? default : value;
-            if (span.IsEmpty)
+            if (ignoreSpace)
+            {
+                value = value.Trim();
+            }
+            if (value.IsEmpty || (!ignoreSpace && value.HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck()))
             {
                 result = default;
                 return false;
             }
-            if (span.IsNumericStartSkipEmptyCheck())
-                return NumericCache<T>.TryParse(span, out result);
+            if (value.IsNumericStartSkipEmptyCheck())
+                return NumericCache<T>.TryParse(value, out result);
 
             return ignoreCase
-                ? SpanCache<T, IgnoreCaseMode>.TryGetValue(span, out result)
-                : SpanCache<T, OrdinalMode>.TryGetValue(span, out result);
+                ? SpanCache<T, IgnoreCaseMode>.TryGetValue(value, out result)
+                : SpanCache<T, OrdinalMode>.TryGetValue(value, out result);
         }
 
         [MethodImpl(Opt.Inline)]
@@ -278,7 +281,11 @@ namespace FerryKit.Core
         private static class Compare<TMode>
         {
             public static readonly StringComparer Comparer = typeof(TMode) == typeof(IgnoreCaseMode) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
-            public static readonly StringComparison Comparison = typeof(TMode) == typeof(IgnoreCaseMode) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            public static StringComparison Comparison
+            {
+                [MethodImpl(Opt.Inline)]
+                get => typeof(TMode) == typeof(IgnoreCaseMode) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            }
         }
 
         private static class StringCache<T, TMode> where T : struct, Enum

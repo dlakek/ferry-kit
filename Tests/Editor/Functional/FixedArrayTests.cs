@@ -10,6 +10,26 @@ namespace FerryKit.Tests.Functional
     public class FixedArrayTests
     {
         [Test]
+        public void EveryFixedArrayIndexer_ReturnsDefaultOutsideItsRange()
+        {
+            var two = new FixedArray2<int>();
+            var three = new FixedArray3<int>();
+            var four = new FixedArray4<int>();
+            var five = new FixedArray5<int>();
+            Assert.That(two.TryParse("1;2".AsSpan()), Is.True);
+            Assert.That(three.TryParse("1;2".AsSpan()), Is.True);
+            Assert.That(four.TryParse("1;2".AsSpan()), Is.True);
+            Assert.That(five.TryParse("1;2".AsSpan()), Is.True);
+            foreach (int index in new[] { int.MinValue, -1, 2, int.MaxValue })
+            {
+                Assert.That(two[index], Is.Zero);
+                Assert.That(three[index], Is.Zero);
+                Assert.That(four[index], Is.Zero);
+                Assert.That(five[index], Is.Zero);
+            }
+        }
+
+        [Test]
         public void FixedArray_TryParse_ConsumesOneCellFromLineReader()
         {
             const string source = "7,1;2;3,0.5";

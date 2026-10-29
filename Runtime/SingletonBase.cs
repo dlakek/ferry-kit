@@ -53,14 +53,16 @@ namespace FerryKit
             _isQuitting = false;
         }
 
+        // Inactive objects can be destroyed before Awake/OnDestroy; reject detached Unity objects too.
         [MethodImpl(Opt.Inline)]
-        private protected static T GetInstance() => _instance is null // null check with is pattern to avoid Unity's overload call (performance optimization)
+        private protected static T GetInstance() => _instance == null
             ? _instance = FindAnyObjectByType<T>(FindObjectsInactive.Include)
             : _instance;
 
         /// <summary>
         /// To enable instance getter inlining optimization, the cold path logic is separated into a separate function.
         /// </summary>
+        [MethodImpl(Opt.NoInline)]
         private protected static T FallbackToCreateInstance()
         {
             if (!_isQuitting)
@@ -70,6 +72,7 @@ namespace FerryKit
             return _instance;
         }
 
+        [MethodImpl(Opt.NoInline)]
         private protected static T FallbackToLogging()
         {
             if (!_isQuitting)

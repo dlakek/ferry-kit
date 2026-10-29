@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -22,7 +23,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] public static string Color(this string str, string color) => str.FormatTag("color", color);
         [MethodImpl(Opt.Inline)] public static string Color(this string str, int r, int g, int b) => str.FormatTag(r, g, b);
 
-        [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this char value) => (uint)(value - '0') <= 9 || value == '+' || value == '-';
+        [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this char value) => value is >= '0' and <= '9' or '+' or '-';
         [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this string value) => !string.IsNullOrEmpty(value) && value.IsNumericStartSkipEmptyCheck();
         [MethodImpl(Opt.Inline)] public static bool IsNumericStart(this ReadOnlySpan<char> value) => !value.IsEmpty && value.IsNumericStartSkipEmptyCheck();
 
@@ -43,18 +44,7 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)] internal static bool HasLeadingOrTrailingWhiteSpaceSkipEmptyCheck(this ReadOnlySpan<char> value) => char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1]);
 
         [MethodImpl(Opt.Inline)]
-        public static bool HasWhiteSpace(this string str)
-        {
-            if (str == null)
-                return false;
-
-            foreach (var c in str)
-            {
-                if (char.IsWhiteSpace(c))
-                    return true;
-            }
-            return false;
-        }
+        public static bool HasWhiteSpace(this string str) => str.AsSpan().HasWhiteSpace();
 
         [MethodImpl(Opt.Inline)]
         public static bool HasWhiteSpace(this ReadOnlySpan<char> span)
@@ -220,7 +210,7 @@ namespace FerryKit.Core
                 }
                 else
                 {
-                    Unsafe.As<T, int>(ref state.value).TryFormat(span[idx..], out int written);
+                    Unsafe.As<T, int>(ref state.value).TryFormat(span[idx..], out int written, provider: CultureInfo.InvariantCulture);
                     idx += written;
                 }
                 span[idx++] = '>';
@@ -261,53 +251,44 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         private static Span<char> ApplyCamelCase(this Span<char> buffer, ReadOnlySpan<char> span)
         {
-            span.CopyTo(buffer);
-            int len = buffer.Length;
-            for (int i = 0; i < len && char.IsUpper(buffer[i]); ++i)
+            int len = span.Length;
+            int i = 0;
+            for (; i < len && char.IsUpper(span[i]); ++i)
             {
-                if (i > 0 && i + 1 < len && char.IsLower(buffer[i + 1]))
+                if (i > 0 && i + 1 < len && char.IsLower(span[i + 1]))
                     break;
 
-                buffer[i] = char.ToLowerInvariant(buffer[i]);
+                buffer[i] = char.ToLowerInvariant(span[i]);
             }
+            span[i..].CopyTo(buffer[i..]);
             return buffer;
         }
 
         [MethodImpl(Opt.Inline)]
         private static Span<char> ApplyPascalCase(this Span<char> buffer, ReadOnlySpan<char> span)
         {
-            span.CopyTo(buffer);
-            buffer[0] = char.ToUpperInvariant(buffer[0]);
+            buffer[0] = char.ToUpperInvariant(span[0]);
+            span[1..].CopyTo(buffer[1..]);
             return buffer;
         }
 
         [MethodImpl(Opt.Inline)]
         private static int Digits(this int value)
         {
-            if (value == 0)
-                return 1;
-
-            int count = 0;
-            if (value < 0)
-            {
-                if (value == int.MinValue)
-                    return 11; // -2147483648
-
-                value = -value;
-                count = 1;
-            }
+            int count = value < 0 ? 1 : 0;
+            uint u = (uint)(value < 0 ? -(long)value : value);
             // This is used for font sizes, which are commonly below 100, so the early switch arms favor that range.
-            return value switch
+            return u switch
             {
-                < 10 => count + 1,
-                < 100 => count + 2,
-                < 1000 => count + 3,
-                < 10000 => count + 4,
-                < 100000 => count + 5,
-                < 1000000 => count + 6,
-                < 10000000 => count + 7,
-                < 100000000 => count + 8,
-                < 1000000000 => count + 9,
+                < 10u => count + 1,
+                < 100u => count + 2,
+                < 1000u => count + 3,
+                < 10000u => count + 4,
+                < 100000u => count + 5,
+                < 1000000u => count + 6,
+                < 10000000u => count + 7,
+                < 100000000u => count + 8,
+                < 1000000000u => count + 9,
                 _ => count + 10
             };
         }
@@ -377,7 +358,11 @@ namespace FerryKit.Core
 
         [MethodImpl(Opt.Inline)]
         public static StringBuilder AppendSize(this StringBuilder sb, string text, int size)
-            => sb.Append("<size=").Append(size).Append('>').Append(text).Append("</size>");
+        {
+            Span<char> value = stackalloc char[11]; // Includes the sign of int.MinValue.
+            size.TryFormat(value, out int written, provider: CultureInfo.InvariantCulture);
+            return sb.Append("<size=").Append(value[..written]).Append('>').Append(text).Append("</size>");
+        }
 
         [MethodImpl(Opt.Inline)]
         public static StringBuilder AppendLink(this StringBuilder sb, string text, string url)
@@ -389,13 +374,16 @@ namespace FerryKit.Core
 
         [MethodImpl(Opt.Inline)]
         public static StringBuilder AppendColor(this StringBuilder sb, string text, int r, int g, int b)
-            => sb.Append("<color=#")
-            .Append(StringHelper.HexTable[(r >> 4) & 0xF])
-            .Append(StringHelper.HexTable[r & 0xF])
-            .Append(StringHelper.HexTable[(g >> 4) & 0xF])
-            .Append(StringHelper.HexTable[g & 0xF])
-            .Append(StringHelper.HexTable[(b >> 4) & 0xF])
-            .Append(StringHelper.HexTable[b & 0xF])
-            .Append('>').Append(text).Append("</color>");
+        {
+            var hex = StringHelper.HexTable;
+            return sb.Append("<color=#")
+                .Append(hex[(r >> 4) & 0xF])
+                .Append(hex[r & 0xF])
+                .Append(hex[(g >> 4) & 0xF])
+                .Append(hex[g & 0xF])
+                .Append(hex[(b >> 4) & 0xF])
+                .Append(hex[b & 0xF])
+                .Append('>').Append(text).Append("</color>");
+        }
     }
 }

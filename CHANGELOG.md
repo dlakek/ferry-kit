@@ -5,6 +5,24 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Array searches delegate to `System.Array` for consistent null, predicate, and range validation.
+- `FindAll` allocates temporary storage only after its first match, sized to the remaining input, while preserving predicate mutations to the source array.
+- Bit-array ID pools track availability to detect exhaustion without scanning the entire pool.
+
+### Fixed
+
+- Boolean parsing, numeric-start detection, negative fixed-array and fallback indexes, size formatting, quote-search indexes, and numeric conversions preserve their contracts with checked arithmetic.
+- Circular and recyclable ID pools support inclusive single-ID ranges and zero-based unsigned allocation without underflow.
+- Bit-array ID releases validate the ID range before subtraction and narrowing conversions.
+- Quote searches preserve the established behavior for quote and backslash search characters.
+- Rich-text size values use invariant numeric syntax even with custom culture negative signs.
+- Data importer settings prefer the default asset, require explicit selection for multiple alternatives, and create files relative to the project's Assets directory without overwriting an existing file or saving unrelated assets.
+- Singleton lookups reject cached Unity objects destroyed while inactive, even if `OnDestroy` never cleared the cache.
+
 ## [0.2.0] - 2026-07-19
 
 ### Added

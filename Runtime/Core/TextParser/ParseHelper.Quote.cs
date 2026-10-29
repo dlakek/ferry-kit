@@ -39,60 +39,57 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, int startIndex, QuoteEscapeMode escapeMode = QuoteEscapeMode.None)
         {
-            if ((uint)startIndex >= (uint)span.Length)
+            if (startIndex < 0 || startIndex >= span.Length)
                 return -1;
 
-            int boundary = 0;
+            int offset = 0;
             while (true)
             {
-                int index = span.IndexOfUnquotedFromBoundary(value, boundary, escapeMode);
-                if (index == -1 || index >= startIndex)
+                int index = span[offset..].IndexOfUnquoted(value, escapeMode);
+                if (index == -1)
+                    return -1;
+
+                index += offset;
+                if (index >= startIndex)
                     return index;
 
-                boundary = index + 1;
+                offset = index + 1;
             }
-        }
-
-        [MethodImpl(Opt.Inline)]
-        internal static int IndexOfUnquotedFromBoundary(this ReadOnlySpan<char> span, char value, int startIndex, QuoteEscapeMode escapeMode)
-        {
-            if ((uint)startIndex >= (uint)span.Length)
-                return -1;
-
-            var slice = span[startIndex..];
-            int index = slice.IndexOfUnquoted(value, escapeMode);
-            return index == -1 ? -1 : startIndex + index;
         }
 
         private static int IndexOfUnquotedCsv(this ReadOnlySpan<char> span, char value)
         {
-            var inQuotes = false;
             int offset = 0;
             int length = span.Length;
             while (offset < length)
             {
-                var slice = span[offset..];
-                int index = inQuotes ? slice.IndexOf('"') : slice.IndexOfAny('"', value);
+                int index = span[offset..].IndexOfAny('"', value);
                 if (index == -1)
                     return -1;
 
-                if (!inQuotes)
-                {
-                    if (slice[index] == value)
-                        return offset + index;
+                offset += index;
+                if (span[offset++] == value)
+                    return offset - 1;
 
-                    inQuotes = true;
-                    offset += index + 1;
-                    continue;
-                }
-                int next = offset + index + 1;
-                if (next < length && span[next] == '"')
+                while (offset < length)
                 {
-                    offset = next + 1;
-                    continue;
+                    index = span[offset..].IndexOf('"');
+                    if (index == -1)
+                        return -1;
+
+                    offset += index + 1;
+                    if (offset >= length)
+                        return -1;
+
+                    char next = span[offset++];
+                    if (next == '"')
+                        continue;
+
+                    if (next == value)
+                        return offset - 1;
+
+                    break;
                 }
-                inQuotes = false;
-                offset = next;
             }
             return -1;
         }

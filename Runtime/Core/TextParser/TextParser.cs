@@ -267,20 +267,21 @@ namespace FerryKit.Core
             int sampleLength = text.Length < _capacitySampleLength ? text.Length : _capacitySampleLength;
             var sample = text.AsSpan(0, sampleLength);
             int lineBreakCount = 0;
-            int offset = 0;
-            while (offset < sampleLength)
+            while (!sample.IsEmpty)
             {
-                int index = sample[offset..].IndexOfUnquoted('\n', escapeMode);
+                int index = sample.IndexOfUnquoted('\n', escapeMode);
                 if (index < 0)
                     break;
 
                 ++lineBreakCount;
-                offset += index + 1;
+                sample = sample[(index + 1)..];
             }
             if (lineBreakCount == 0)
                 return _defaultInitialCapacity;
 
-            long estimatedCapacity = ((long)text.Length * lineBreakCount + sampleLength - 1) / sampleLength + 1;
+            long estimatedCapacity = sampleLength == text.Length
+                ? lineBreakCount + 1
+                : ((long)text.Length * lineBreakCount + sampleLength - 1) / sampleLength + 1;
             if (estimatedCapacity <= _defaultInitialCapacity)
                 return _defaultInitialCapacity;
 

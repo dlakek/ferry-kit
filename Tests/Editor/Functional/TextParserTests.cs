@@ -10,6 +10,19 @@ namespace FerryKit.Core.Tests.Functional
         [Flags] private enum Options : byte { None = 0, A = 1, B = 2 }
 
         [Test]
+        public void BooleanParsing_RejectsEveryNonBitSingleCharacterWithoutThrowing()
+        {
+            for (int code = char.MinValue; code <= char.MaxValue; ++code)
+            {
+                string text = ((char)code).ToString();
+                bool success = text.AsSpan().TryToBool(out bool value);
+                if (success != (code == '0' || code == '1') || value != (code == '1'))
+                    Assert.Fail($"Unexpected boolean parse for character U+{code:X4}.");
+            }
+            Assert.Throws<FormatException>(() => "/".AsSpan().ToBool());
+        }
+
+        [Test]
         public void PrimitiveAndCompositeParsing_CoversSuccessEmptyAndFailurePaths()
         {
             CultureInfo original = CultureInfo.CurrentCulture;

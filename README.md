@@ -77,8 +77,16 @@ foreach (var row in table)
 
 `Load` parses into a replacement list and swaps it only on success, preserving serialized data after a failed reimport.
 
+## ID pools
+
+`CircularIdPool<T, TOp>` and `RecyclableIdPool<T, TOp>` include both `startId` and `maxId`, including single-ID ranges. Zero-based unsigned ranges are supported. Circular pools wrap without tracking live IDs; recyclable pools reject exhaustion until an ID is released.
+
+`BitArrayIdPool<T, TOp>` tracks a fixed contiguous range, rejects invalid or duplicate releases, and detects exhaustion in constant time. Finding a free ID still takes up to `capacity` bit checks.
+
 ## Validation
 
 This repository does not include a Unity test host or automated test runner. Run validation locally from the Unity project that consumes this package.
 
 Tests marked `Explicit` are benchmark probes; run them explicitly when collecting performance measurements.
+
+Exercise core boundary tests with overflow checking both enabled and disabled. Standalone .NET tests and reference-assembly compilation do not validate Unity object lifetimes, AssetDatabase operations, or Mono/IL2CPP Player behavior.

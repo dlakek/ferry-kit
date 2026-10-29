@@ -236,6 +236,16 @@ namespace FerryKit.Core.Tests.Functional
             Assert.Throws<ArgumentOutOfRangeException>(() => default(ULongOp).ToInt((ulong)int.MaxValue + 1));
         }
 
+        [Test]
+        public void LongConversion_ValidatesBothBoundsBeforeNarrowing()
+        {
+            var op = default(LongOp);
+            Assert.That(op.ToInt(int.MinValue), Is.EqualTo(int.MinValue));
+            Assert.That(op.ToInt(int.MaxValue), Is.EqualTo(int.MaxValue));
+            foreach (long value in new[] { long.MinValue, (long)int.MinValue - 1, (long)int.MaxValue + 1, long.MaxValue })
+                Assert.Throws<ArgumentOutOfRangeException>(() => op.ToInt(value));
+        }
+
         private static void VerifyOperator<T, TOp>(int ai, int bi, int sum, int product, int quotient, int remainder)
             where T : struct where TOp : struct, INumOp<T>
         {

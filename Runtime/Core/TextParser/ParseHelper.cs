@@ -42,16 +42,15 @@ namespace FerryKit.Core
         public static int CountElements(this ReadOnlySpan<char> span, char separator, QuoteEscapeMode escapeMode)
         {
             int count = 1;
-            int index = 0;
-            while ((index = span.IndexOfUnquotedFromBoundary(separator, index, escapeMode)) != -1)
+            while (true)
             {
-                if (++index == span.Length)
-                    break;
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                if (index == -1 || ++index == span.Length)
+                    return count;
 
                 ++count;
+                span = span[index..];
             }
-            return count;
         }
-
     }
 }

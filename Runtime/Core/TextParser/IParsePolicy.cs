@@ -20,13 +20,13 @@ namespace FerryKit.Core
     /// </summary>
     public readonly struct DefaultPolicy : IParsePolicy
     {
-        public readonly char ColSep => ParsePolicyDefaults.ColumnSeparator;
-        public readonly char ArrSep => ParsePolicyDefaults.ArraySeparator;
-        public readonly char SetSep => ParsePolicyDefaults.SetSeparator;
-        public readonly char DictSep => ParsePolicyDefaults.DictionarySeparator;
-        public readonly char PairSep => ParsePolicyDefaults.PairSeparator;
-        public readonly bool IgnoreCase => ParsePolicyDefaults.IgnoreCase;
-        public readonly QuoteEscapeMode EscapeMode => ParsePolicyDefaults.EscapeMode;
+        public char ColSep => ParsePolicyDefaults.ColumnSeparator;
+        public char ArrSep => ParsePolicyDefaults.ArraySeparator;
+        public char SetSep => ParsePolicyDefaults.SetSeparator;
+        public char DictSep => ParsePolicyDefaults.DictionarySeparator;
+        public char PairSep => ParsePolicyDefaults.PairSeparator;
+        public bool IgnoreCase => ParsePolicyDefaults.IgnoreCase;
+        public QuoteEscapeMode EscapeMode => ParsePolicyDefaults.EscapeMode;
     }
 
     /// <summary>
@@ -41,13 +41,13 @@ namespace FerryKit.Core
         /// </summary>
         public static readonly CustomPolicy Default = new(colSep: ParsePolicyDefaults.ColumnSeparator);
 
-        public readonly char ColSep { get; }
-        public readonly char ArrSep { get; }
-        public readonly char SetSep { get; }
-        public readonly char DictSep { get; }
-        public readonly char PairSep { get; }
-        public readonly bool IgnoreCase { get; }
-        public readonly QuoteEscapeMode EscapeMode { get; }
+        public char ColSep { get; }
+        public char ArrSep { get; }
+        public char SetSep { get; }
+        public char DictSep { get; }
+        public char PairSep { get; }
+        public bool IgnoreCase { get; }
+        public QuoteEscapeMode EscapeMode { get; }
 
         public CustomPolicy(
             char colSep = ParsePolicyDefaults.ColumnSeparator,

@@ -42,18 +42,10 @@ namespace FerryKit.Core
         [MethodImpl(Opt.Inline)]
         private static bool TryParseForBit(this ReadOnlySpan<char> span, out bool result)
         {
-            if (span.Length == 1)
+            if (span.Length == 1 && span[0] is '0' or '1')
             {
-                if (span[0] == '1')
-                {
-                    result = true;
-                    return true;
-                }
-                if (span[0] == '0')
-                {
-                    result = false;
-                    return true;
-                }
+                result = span[0] == '1';
+                return true;
             }
             result = false;
             return false;

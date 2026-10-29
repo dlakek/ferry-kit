@@ -33,12 +33,12 @@ namespace FerryKit.Core
             if (_op.LT(startId, _op.Zero))
                 throw new ArgumentException("startId must be non-negative.");
 
-            if (_op.LTE(maxId, startId))
-                throw new ArgumentException("maxId must be greater than startId.");
+            if (_op.LT(maxId, startId))
+                throw new ArgumentException("maxId must be greater than or equal to startId.");
 
             _startId = startId;
             _maxId = maxId;
-            _curId = _op.Sub(startId, _op.One);
+            _curId = maxId;
         }
 
         [MethodImpl(Opt.Inline)]
@@ -64,6 +64,7 @@ namespace FerryKit.Core
         private readonly T _maxId;
 
         private T _curId;
+        private bool _hasAllocated;
 
         public RecyclableIdPool() : this(default(TOp).Zero, default(TOp).Max) { }
         public RecyclableIdPool(T startId) : this(startId, default(TOp).Max) { }
@@ -72,33 +73,49 @@ namespace FerryKit.Core
             if (_op.LT(startId, _op.Zero))
                 throw new ArgumentException("startId must be non-negative.");
 
-            if (_op.LTE(maxId, startId))
-                throw new ArgumentException("maxId must be greater than startId.");
+            if (_op.LT(maxId, startId))
+                throw new ArgumentException("maxId must be greater than or equal to startId.");
 
             _maxId = maxId;
-            _curId = _op.Sub(startId, _op.One);
+            _curId = startId;
         }
 
+        [MethodImpl(Opt.Inline)]
         public T NextId()
         {
             if (!_usableIds.TryPop(out T id))
             {
-                if (_op.GTE(_curId, _maxId))
-                    throw new InvalidOperationException($"no more IDs available. max: {_maxId}");
+                if (_hasAllocated)
+                {
+                    if (_op.GTE(_curId, _maxId))
+                        ThrowExhausted(_maxId);
 
-                id = _op.Inc(ref _curId);
+                    id = _op.Inc(ref _curId);
+                }
+                else
+                {
+                    id = _curId;
+                    _hasAllocated = true;
+                }
             }
             _usingIds.Add(id);
             return id;
         }
 
+        [MethodImpl(Opt.Inline)]
         public void ReleaseId(T id)
         {
             if (!_usingIds.Remove(id))
-                throw new InvalidOperationException($"ID {id} is not currently in use or already released.");
+                ThrowInvalidRelease(id);
 
             _usableIds.Push(id);
         }
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowExhausted(T maxId) => throw new InvalidOperationException($"no more IDs available. max: {maxId}");
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowInvalidRelease(T id) => throw new InvalidOperationException($"ID {id} is not currently in use or already released.");
     }
 
     /// <summary>
@@ -110,18 +127,18 @@ namespace FerryKit.Core
         where T : struct
         where TOp : struct, INumOp<T>
     {
-        private const int DEFAULT_CAPACITY = 1024;
+        private const int _defaultCapacity = 1024;
 
         private readonly TOp _op = default;
         private readonly T _startId;
         private readonly int _capacity;
-        private readonly int _limit;
         private readonly BitArray _idUsage;
 
-        private int _curIdx = 0;
+        private int _curIdx;
+        private int _availableCount;
 
-        public BitArrayIdPool() : this(default(TOp).Zero, DEFAULT_CAPACITY) { }
-        public BitArrayIdPool(T startId) : this(startId, DEFAULT_CAPACITY) { }
+        public BitArrayIdPool() : this(default(TOp).Zero, _defaultCapacity) { }
+        public BitArrayIdPool(T startId) : this(startId, _defaultCapacity) { }
         public BitArrayIdPool(T startId, int capacity)
         {
             if (_op.LT(startId, _op.Zero))
@@ -135,40 +152,54 @@ namespace FerryKit.Core
 
             _startId = startId;
             _capacity = capacity;
-            _limit = capacity - 1;
             _idUsage = new(capacity);
+            _availableCount = capacity;
         }
 
         public T NextId()
         {
-            // The next free bit is O(1) when found immediately and O(capacity) in the worst case.
+            if (_availableCount == 0)
+                return ThrowExhausted();
+
+            // A free bit exists. Search from the cursor, preserving circular allocation order.
             int idx = _curIdx;
-            for (int i = 0; i < _capacity; ++i)
+            while (_idUsage.Get(idx))
             {
-                if (!_idUsage.Get(idx))
-                {
-                    _idUsage.Set(idx, true);
-                    _curIdx = idx < _limit ? idx + 1 : 0;
-                    return _op.Add(_startId, _op.FromInt(idx));
-                }
-                if (++idx > _limit)
-                {
+                if (++idx == _capacity)
                     idx = 0;
-                }
             }
-            throw new InvalidOperationException("pool exhausted: no bits available.");
+            _idUsage.Set(idx, true);
+            --_availableCount;
+            _curIdx = idx + 1 < _capacity ? idx + 1 : 0;
+            return _op.Add(_startId, _op.FromInt(idx));
         }
 
+        [MethodImpl(Opt.Inline)]
         public void ReleaseId(T id)
         {
-            int idx = _op.ToInt(_op.Sub(id, _startId));
-            if (idx < 0 || idx >= _capacity)
-                throw new ArgumentOutOfRangeException(nameof(id), $"ID {id} is out of bounds. startId: {_startId}, capacity: {_capacity}");
+            if (_op.LT(id, _startId))
+                ThrowOutOfBounds(id, _startId, _capacity);
 
+            T offset = _op.Sub(id, _startId);
+            if (_op.GTE(offset, _op.FromInt(_capacity)))
+                ThrowOutOfBounds(id, _startId, _capacity);
+
+            int idx = _op.ToInt(offset);
             if (!_idUsage.Get(idx))
-                throw new InvalidOperationException($"ID {id} is already released.");
+                ThrowAlreadyReleased(id);
 
             _idUsage.Set(idx, false);
+            ++_availableCount;
         }
+
+        [MethodImpl(Opt.NoInline)]
+        private static T ThrowExhausted() => throw new InvalidOperationException("pool exhausted: no bits available.");
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowOutOfBounds(T id, T startId, int capacity)
+            => throw new ArgumentOutOfRangeException(nameof(id), $"ID {id} is out of bounds. startId: {startId}, capacity: {capacity}");
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowAlreadyReleased(T id) => throw new InvalidOperationException($"ID {id} is already released.");
     }
 }

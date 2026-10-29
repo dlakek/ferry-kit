@@ -83,7 +83,7 @@ namespace FerryKit.Core
         public T Read<T>()
         {
             var cell = ReadNext();
-            if (_currentWasQuoted && cell.TryGetUnescapeCsvQuotes(out T value))
+            if (typeof(T) == typeof(string) && _currentWasQuoted && cell.TryGetUnescapeCsvQuotes(out T value))
                 return value;
 
             return cell.To<T, P>(_policy);
@@ -94,7 +94,7 @@ namespace FerryKit.Core
         {
             if (TryReadNext(out var cell))
             {
-                if (_currentWasQuoted && cell.TryGetUnescapeCsvQuotes(out result))
+                if (typeof(T) == typeof(string) && _currentWasQuoted && cell.TryGetUnescapeCsvQuotes(out result))
                     return true;
 
                 return cell.TryTo(out result, _policy);
@@ -173,7 +173,7 @@ namespace FerryKit.Core
                 _nextIndex += separatorIndex + 1;
                 cell = remaining[..separatorIndex];
             }
-            _currentWasQuoted = cell.Length > 1 && cell[0] == '"' && cell[^1] == '"';
+            _currentWasQuoted = cell.IsInQuotes();
             _current = _currentWasQuoted ? cell[1..^1] : cell;
             result = _current;
             return true;

@@ -8,6 +8,56 @@ namespace FerryKit.Core.Tests.Functional
     public class ArrayAndCollectionHelperTests
     {
         [Test]
+        public void ArraySearch_ValidatesRangesLikeSystemArray()
+        {
+            Predicate<int> match = static value => value == 1;
+            int[] boundaries = { int.MinValue, -1, 0, 1, 2, 3, 4, int.MaxValue };
+            foreach (var values in new[] { Array.Empty<int>(), new[] { 0, 1, 1 } })
+            {
+                foreach (int start in boundaries)
+                {
+                    Assert.That(SearchOutcome(() => ArrayHelper.FindIndex(values, start, match)),
+                        Is.EqualTo(SearchOutcome(() => Array.FindIndex(values, start, match))));
+                    Assert.That(SearchOutcome(() => ArrayHelper.FindLastIndex(values, start, match)),
+                        Is.EqualTo(SearchOutcome(() => Array.FindLastIndex(values, start, match))));
+                    foreach (int count in boundaries)
+                    {
+                        Assert.That(SearchOutcome(() => ArrayHelper.FindIndex(values, start, count, match)),
+                            Is.EqualTo(SearchOutcome(() => Array.FindIndex(values, start, count, match))));
+                        Assert.That(SearchOutcome(() => ArrayHelper.FindLastIndex(values, start, count, match)),
+                            Is.EqualTo(SearchOutcome(() => Array.FindLastIndex(values, start, count, match))));
+                    }
+                }
+                Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindIndex(values, null));
+                Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindLastIndex(values, null));
+            }
+            Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindIndex<int>(null, match));
+            Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindLastIndex<int>(null, match));
+        }
+
+        [Test]
+        public void ArrayFindAll_PreservesPredicateMutationsAndHandlesNoMatches()
+        {
+            int[] values = { 1, 2 };
+            int index = 0;
+            var result = ArrayHelper.FindAll(values, _ =>
+            {
+                values[index++] *= 10;
+                return true;
+            });
+            Assert.That(result, Is.EqualTo(new[] { 10, 20 }));
+            Assert.That(ArrayHelper.FindAll(values, static _ => false), Is.Empty);
+            Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindAll<int>(null, static _ => true));
+            Assert.Throws<ArgumentNullException>(() => ArrayHelper.FindAll(Array.Empty<int>(), null));
+        }
+
+        private static (int Index, Type Exception) SearchOutcome(Func<int> search)
+        {
+            try { return (search(), null); }
+            catch (Exception ex) { return (0, ex.GetType()); }
+        }
+
+        [Test]
         public void ArrayHelpers_CoverSearchMutationProjectionAndBounds()
         {
             int[] values = { 3, 1, 2, 1 };

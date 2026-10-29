@@ -17,7 +17,7 @@ namespace FerryKit
         [SerializeField] private T _item1;
 
         public readonly int Count => (int)_count;
-        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
+        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, unchecked((uint)index));
 
         [MethodImpl(Opt.Inline)] public bool TryParse(ReadOnlySpan<char> value) => FixedArrayHelper.TryParse(value, default(DefaultPolicy), Capacity, ref _count, ref _item0);
         [MethodImpl(Opt.Inline)] public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
@@ -37,7 +37,7 @@ namespace FerryKit
         [SerializeField] private T _item2;
 
         public readonly int Count => (int)_count;
-        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
+        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, unchecked((uint)index));
 
         [MethodImpl(Opt.Inline)] public bool TryParse(ReadOnlySpan<char> value) => FixedArrayHelper.TryParse(value, default(DefaultPolicy), Capacity, ref _count, ref _item0);
         [MethodImpl(Opt.Inline)] public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
@@ -58,7 +58,7 @@ namespace FerryKit
         [SerializeField] private T _item3;
 
         public readonly int Count => (int)_count;
-        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
+        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, unchecked((uint)index));
 
         [MethodImpl(Opt.Inline)] public bool TryParse(ReadOnlySpan<char> value) => FixedArrayHelper.TryParse(value, default(DefaultPolicy), Capacity, ref _count, ref _item0);
         [MethodImpl(Opt.Inline)] public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
@@ -80,7 +80,7 @@ namespace FerryKit
         [SerializeField] private T _item4;
 
         public readonly int Count => (int)_count;
-        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, (uint)index);
+        public readonly T this[int index] => FixedArrayHelper.Get(in _item0, _count, Capacity, unchecked((uint)index));
 
         [MethodImpl(Opt.Inline)] public bool TryParse(ReadOnlySpan<char> value) => FixedArrayHelper.TryParse(value, default(DefaultPolicy), Capacity, ref _count, ref _item0);
         [MethodImpl(Opt.Inline)] public bool TryParse<P>(ReadOnlySpan<char> value, P policy) where P : struct, IParsePolicy => FixedArrayHelper.TryParse(value, policy, Capacity, ref _count, ref _item0);
@@ -137,25 +137,22 @@ namespace FerryKit
             var remaining = value;
             char separator = policy.ArrSep;
             var escapeMode = policy.EscapeMode;
-            while (true)
+            while (!remaining.IsEmpty)
             {
                 if (parsedCount >= capacity)
                     return false;
 
                 int idx = remaining.IndexOfUnquoted(separator, escapeMode);
-                var token = idx == -1 ? remaining : remaining[..idx];
-                if (!parser.TryParse(token, policy, out var item))
+                if (!parser.TryParse(idx == -1 ? remaining : remaining[..idx], policy, out var item))
                     return false;
 
-                parsed[(int)parsedCount] = item;
-                ++parsedCount;
+                parsed[(int)parsedCount++] = item;
                 if (idx == -1)
-                    return Complete(ref count, ref first, previousCount, parsed, parsedCount);
+                    break;
 
                 remaining = remaining[(idx + 1)..];
-                if (remaining.IsEmpty)
-                    return Complete(ref count, ref first, previousCount, parsed, parsedCount);
             }
+            return Complete(ref count, ref first, previousCount, parsed, parsedCount);
         }
 
         [MethodImpl(Opt.Inline)]

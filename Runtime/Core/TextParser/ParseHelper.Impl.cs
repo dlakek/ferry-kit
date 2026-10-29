@@ -22,27 +22,26 @@ namespace FerryKit.Core
             where TParser : struct, IParser<T, P>
             => parser.Parse(span, policy);
 
+        [MethodImpl(Opt.Inline)]
         private static bool TryToImpl<T, P>(this ReadOnlySpan<char> span, P policy, out T result) where P : struct, IParsePolicy
         {
-            var type = typeof(T);
-            return type switch
-            {
-                _ when type == typeof(sbyte) => TryCast(span.TryToSByte(out sbyte value), value, out result),
-                _ when type == typeof(byte) => TryCast(span.TryToByte(out byte value), value, out result),
-                _ when type == typeof(short) => TryCast(span.TryToShort(out short value), value, out result),
-                _ when type == typeof(ushort) => TryCast(span.TryToUShort(out ushort value), value, out result),
-                _ when type == typeof(int) => TryCast(span.TryToInt(out int value), value, out result),
-                _ when type == typeof(uint) => TryCast(span.TryToUInt(out uint value), value, out result),
-                _ when type == typeof(long) => TryCast(span.TryToLong(out long value), value, out result),
-                _ when type == typeof(ulong) => TryCast(span.TryToULong(out ulong value), value, out result),
-                _ when type == typeof(float) => TryCast(span.TryToFloat(out float value), value, out result),
-                _ when type == typeof(double) => TryCast(span.TryToDouble(out double value), value, out result),
-                _ when type == typeof(bool) => TryCast(span.TryToBool(out bool value), value, out result),
-                _ when type == typeof(string) => TryCast(span.TryToStr(out string value), value, out result),
-                _ when type == typeof(DateTime) => TryCast(span.TryToDateTime(out var value), value, out result),
-                _ when type.IsEnum => span.TryToEnumImpl(policy, out result),
-                _ => TryCast(false, default(T), out result),
-            };
+            if (typeof(T) == typeof(int)) return TryCast(span.TryToInt(out int vInt), vInt, out result);
+            if (typeof(T) == typeof(float)) return TryCast(span.TryToFloat(out float vFloat), vFloat, out result);
+            if (typeof(T) == typeof(string)) return TryCast(span.TryToStr(out string vStr), vStr, out result);
+            if (typeof(T) == typeof(bool)) return TryCast(span.TryToBool(out bool vBool), vBool, out result);
+            if (typeof(T) == typeof(long)) return TryCast(span.TryToLong(out long vLong), vLong, out result);
+            if (typeof(T) == typeof(double)) return TryCast(span.TryToDouble(out double vDouble), vDouble, out result);
+            if (typeof(T) == typeof(uint)) return TryCast(span.TryToUInt(out uint vUInt), vUInt, out result);
+            if (typeof(T) == typeof(byte)) return TryCast(span.TryToByte(out byte vByte), vByte, out result);
+            if (typeof(T) == typeof(short)) return TryCast(span.TryToShort(out short vShort), vShort, out result);
+            if (typeof(T) == typeof(ushort)) return TryCast(span.TryToUShort(out ushort vUShort), vUShort, out result);
+            if (typeof(T) == typeof(sbyte)) return TryCast(span.TryToSByte(out sbyte vSByte), vSByte, out result);
+            if (typeof(T) == typeof(ulong)) return TryCast(span.TryToULong(out ulong vULong), vULong, out result);
+            if (typeof(T) == typeof(DateTime)) return TryCast(span.TryToDateTime(out var vDateTime), vDateTime, out result);
+            if (typeof(T).IsEnum) return span.TryToEnumImpl(policy, out result);
+
+            result = default;
+            return false;
         }
 
         [MethodImpl(Opt.Inline)]
@@ -68,11 +67,10 @@ namespace FerryKit.Core
 
             var escapeMode = policy.EscapeMode;
             bool ignoreCase = policy.IgnoreCase;
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary('|', start, escapeMode);
-                var token = index == -1 ? span[start..] : span[start..index];
+                int index = span.IndexOfUnquoted('|', escapeMode);
+                var token = index == -1 ? span : span[..index];
                 if (!token.TryParseUnchecked(out T parsed, ignoreCase))
                     return false;
 
@@ -80,7 +78,7 @@ namespace FerryKit.Core
                 if (index == -1)
                     return true;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             return true;
         }
@@ -95,16 +93,15 @@ namespace FerryKit.Core
             char separator = policy.ArrSep;
             var escapeMode = policy.EscapeMode;
             var result = new T[span.CountElements(separator, escapeMode)];
-            int start = 0;
             int written = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                result[written++] = parser.Parse(index == -1 ? span[start..] : span[start..index], policy);
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                result[written++] = parser.Parse(index == -1 ? span : span[..index], policy);
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             return result;
         }
@@ -121,10 +118,20 @@ namespace FerryKit.Core
             char separator = policy.ArrSep;
             var escapeMode = policy.EscapeMode;
             var candidate = new T[span.CountElements(separator, escapeMode)];
-            if (!span.TryParseElementsImpl(candidate.AsSpan(), policy, parser, out _))
+            int written = 0;
+            while (!span.IsEmpty)
             {
-                result = null;
-                return false;
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                if (!parser.TryParse(index == -1 ? span : span[..index], policy, out var value))
+                {
+                    result = null;
+                    return false;
+                }
+                candidate[written++] = value;
+                if (index == -1)
+                    break;
+
+                span = span[(index + 1)..];
             }
             result = candidate;
             return true;
@@ -140,15 +147,14 @@ namespace FerryKit.Core
             char separator = policy.ArrSep;
             var escapeMode = policy.EscapeMode;
             var result = new List<T>(span.CountElements(separator, escapeMode));
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                result.Add(parser.Parse(index == -1 ? span[start..] : span[start..index], policy));
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                result.Add(parser.Parse(index == -1 ? span : span[..index], policy));
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             return result;
         }
@@ -165,10 +171,19 @@ namespace FerryKit.Core
             char separator = policy.ArrSep;
             var escapeMode = policy.EscapeMode;
             var candidate = new List<T>(span.CountElements(separator, escapeMode));
-            if (!span.TryAppendImpl(candidate, policy, parser, out _))
+            while (!span.IsEmpty)
             {
-                result = null;
-                return false;
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                if (!parser.TryParse(index == -1 ? span : span[..index], policy, out var value))
+                {
+                    result = null;
+                    return false;
+                }
+                candidate.Add(value);
+                if (index == -1)
+                    break;
+
+                span = span[(index + 1)..];
             }
             result = candidate;
             return true;
@@ -184,18 +199,17 @@ namespace FerryKit.Core
             char separator = policy.SetSep;
             var escapeMode = policy.EscapeMode;
             var result = new HashSet<T>(span.CountElements(separator, escapeMode));
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                var token = index == -1 ? span[start..] : span[start..index];
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                var token = index == -1 ? span : span[..index];
                 if (!result.Add(parser.Parse(token, policy)))
-                    throw new ArgumentException($"duplicate item. text: {token.ToString()}");
+                    ThrowDuplicateItem(token);
 
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             return result;
         }
@@ -212,11 +226,10 @@ namespace FerryKit.Core
             char separator = policy.SetSep;
             var escapeMode = policy.EscapeMode;
             var candidate = new HashSet<T>(span.CountElements(separator, escapeMode));
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                var token = index == -1 ? span[start..] : span[start..index];
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                var token = index == -1 ? span : span[..index];
                 if (!parser.TryParse(token, policy, out var value) || !candidate.Add(value))
                 {
                     result = null;
@@ -225,7 +238,7 @@ namespace FerryKit.Core
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             result = candidate;
             return true;
@@ -242,17 +255,16 @@ namespace FerryKit.Core
             char separator = policy.DictSep;
             var escapeMode = policy.EscapeMode;
             var result = new Dictionary<K, V>(span.CountElements(separator, escapeMode));
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                var token = index == -1 ? span[start..] : span[start..index];
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                var token = index == -1 ? span : span[..index];
                 var pair = token.ToPairImpl<K, V, P, TKParser, TVParser>(policy, keyParser, valueParser);
                 result.Add(pair.Item1, pair.Item2);
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             return result;
         }
@@ -270,11 +282,10 @@ namespace FerryKit.Core
             char separator = policy.DictSep;
             var escapeMode = policy.EscapeMode;
             var candidate = new Dictionary<K, V>(span.CountElements(separator, escapeMode));
-            int start = 0;
-            while (start < span.Length)
+            while (!span.IsEmpty)
             {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                var token = index == -1 ? span[start..] : span[start..index];
+                int index = span.IndexOfUnquoted(separator, escapeMode);
+                var token = index == -1 ? span : span[..index];
                 if (!token.TryToPairImpl<K, V, P, TKParser, TVParser>(policy, keyParser, valueParser, out var pair) || !candidate.TryAdd(pair.Item1, pair.Item2))
                 {
                     result = null;
@@ -283,7 +294,7 @@ namespace FerryKit.Core
                 if (index == -1)
                     break;
 
-                start = index + 1;
+                span = span[(index + 1)..];
             }
             result = candidate;
             return true;
@@ -296,7 +307,7 @@ namespace FerryKit.Core
         {
             int index = span.IndexOfUnquoted(policy.PairSep, policy.EscapeMode);
             if (index == -1)
-                throw new FormatException($"invalid pair format. text: {span.ToString()}");
+                ThrowInvalidPair(span);
 
             return (keyParser.Parse(span[..index], policy), valueParser.Parse(span[(index + 1)..], policy));
         }
@@ -316,76 +327,20 @@ namespace FerryKit.Core
             return false;
         }
 
-        private static bool TryParseElementsImpl<T, P, TParser>(this ReadOnlySpan<char> span, Span<T> destination, P policy, TParser parser, out int written)
-            where P : struct, IParsePolicy
-            where TParser : struct, IParser<T, P>
-        {
-            written = 0;
-            if (span.IsWhiteSpace())
-                return true;
-
-            char separator = policy.ArrSep;
-            var escapeMode = policy.EscapeMode;
-            int start = 0;
-            while (start < span.Length)
-            {
-                if (written >= destination.Length)
-                    return false;
-
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                if (!parser.TryParse(index == -1 ? span[start..] : span[start..index], policy, out var value))
-                    return false;
-
-                destination[written++] = value;
-                if (index == -1)
-                    return true;
-
-                start = index + 1;
-            }
-            return true;
-        }
-
-        private static bool TryAppendImpl<T, P, TParser>(this ReadOnlySpan<char> span, List<T> destination, P policy, TParser parser, out int appendedCount)
-            where P : struct, IParsePolicy
-            where TParser : struct, IParser<T, P>
-        {
-            if (destination == null)
-                throw new ArgumentNullException(nameof(destination));
-
-            int originalCount = destination.Count;
-            if (span.IsWhiteSpace())
-            {
-                appendedCount = 0;
-                return true;
-            }
-            char separator = policy.ArrSep;
-            var escapeMode = policy.EscapeMode;
-            int start = 0;
-            while (start < span.Length)
-            {
-                int index = span.IndexOfUnquotedFromBoundary(separator, start, escapeMode);
-                if (!parser.TryParse(index == -1 ? span[start..] : span[start..index], policy, out var value))
-                {
-                    destination.RemoveRange(originalCount, destination.Count - originalCount);
-                    appendedCount = 0;
-                    return false;
-                }
-                destination.Add(value);
-                if (index == -1)
-                    break;
-
-                start = index + 1;
-            }
-            appendedCount = destination.Count - originalCount;
-            return true;
-        }
-
         [MethodImpl(Opt.Inline)]
         private static bool TryCast<TSource, T>(bool success, TSource value, out T result)
         {
             result = success ? Unsafe.As<TSource, T>(ref value) : default;
             return success;
         }
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowDuplicateItem(ReadOnlySpan<char> token)
+            => throw new ArgumentException($"duplicate item. text: {token.ToString()}");
+
+        [MethodImpl(Opt.NoInline)]
+        private static void ThrowInvalidPair(ReadOnlySpan<char> span)
+            => throw new FormatException($"invalid pair format. text: {span.ToString()}");
 
         [MethodImpl(Opt.NoInline)]
         private static T ThrowException<T>(ReadOnlySpan<char> span)
